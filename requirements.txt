@@ -1,0 +1,20 @@
+# NCLE Web Backend Requirements
+
+# Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Molecular Biology
+biopython>=1.81
+MDAnalysis>=2.6.0
+
+# Topology Analysis
+topoly>=1.0.0
+
+# Optional: For better performance
+# python-multipart>=0.0.6

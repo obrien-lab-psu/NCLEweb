@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCLE - Native Gaussian Entanglement Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Tabulator for interactive tables -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Upload Page -->
+        <div id="uploadPage" class="page">
+            <header>
+                <h1>Native Gaussian Entanglement Analyzer</h1>
+                <p>Upload a PDB file to calculate Native GE</p>
+            </header>
+
+            <div class="upload-section">
+                <div class="upload-box">
+                    <div class="upload-icon">📁</div>
+                    <h2>Upload PDB File</h2>
+                    <p>Click to select or drag and drop</p>
+                    <input type="file" id="pdbFile" accept=".pdb" style="display: none;">
+                    <label for="pdbFile" class="btn btn-primary">Choose File</label>
+                    <div id="fileName" class="file-name"></div>
+                </div>
+                
+                <button id="analyzeBtn" class="btn btn-large btn-success" disabled>Analyze Structure</button>
+            </div>
+
+            <div class="info-section">
+                <h3>About This Tool</h3>
+                <p>This tool calculates Native Gaussian Entanglement (GE) from PDB structures. Upload a PDB file and the analysis will identify entanglements, crossings, and topological features.</p>
+                <ul>
+                    <li>Maximum file size: 20 MB</li>
+                    <li>Accepted format: .pdb</li>
+                    <li>Analysis typically takes 10-60 seconds</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Processing Page -->
+        <div id="processingPage" class="page" style="display: none;">
+            <header>
+                <h1>Processing...</h1>
+            </header>
+            
+            <div class="processing-section">
+                <div class="spinner"></div>
+                <h2>Analyzing Structure</h2>
+                <p id="processingMessage">Uploading file and calculating entanglements...</p>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Page -->
+        <div id="resultsPage" class="page" style="display: none;">
+            <header>
+                <h1>Analysis Results</h1>
+                <button id="newAnalysisBtn" class="btn btn-secondary">New Analysis</button>
+            </header>
+
+            <div class="results-section">
+                <div class="results-header">
+                    <h2 id="resultsTitle">Native Gaussian Entanglement Results</h2>
+                    <div class="results-actions">
+                        <button id="downloadCSV" class="btn btn-primary">Download CSV</button>
+                    </div>
+                </div>
+                
+                <div id="resultsStats" class="stats-row">
+                    <!-- Stats will be inserted here -->
+                </div>
+                
+                <div id="resultsTable" class="table-container">
+                    <!-- Tabulator table will be rendered here -->
+                </div>
+                
+                <div id="noResults" class="no-results" style="display: none;">
+                    <p>No entanglements detected in this structure.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

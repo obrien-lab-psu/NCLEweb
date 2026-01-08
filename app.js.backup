@@ -1,0 +1,237 @@
+// Global state
+let pyodide = null;
+let nglStage = null;
+let pdbText = null;
+let csvText = null;
+let resultsTable = null;
+
+// DOM elements
+const pdbFileInput = document.getElementById('pdbFile');
+const fileNameDisplay = document.getElementById('fileName');
+const runAnalysisBtn = document.getElementById('runAnalysis');
+const downloadCSVBtn = document.getElementById('downloadCSV');
+const statusArea = document.getElementById('status');
+const statusMessage = statusArea.querySelector('.status-message');
+const noResultsDiv = document.getElementById('noResults');
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    updateStatus('Initializing NGL Viewer...', 'loading');
+    initNGLViewer();
+    
+    updateStatus('Loading Pyodide runtime... (this may take a moment)', 'loading');
+    await loadPyodideOnce();
+    
+    updateStatus('Ready. Please upload a PDB file.', 'success');
+});
+
+// File upload handler
+pdbFileInput.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    fileNameDisplay.textContent = file.name;
+    updateStatus(`Loading ${file.name}...`, 'loading');
+    
+    try {
+        pdbText = await file.text();
+        await loadPDBIntoNGL(pdbText);
+        runAnalysisBtn.disabled = false;
+        updateStatus(`${file.name} loaded successfully. Ready to analyze.`, 'success');
+    } catch (error) {
+        updateStatus(`Error loading PDB: ${error.message}`, 'error');
+        console.error(error);
+    }
+});
+
+// Run analysis handler
+runAnalysisBtn.addEventListener('click', async () => {
+    if (!pdbText || !pyodide) return;
+    
+    updateStatus('Running analysis...', 'loading');
+    runAnalysisBtn.disabled = true;
+    
+    try {
+        csvText = await runPythonAnalysis(pdbText);
+        displayCSVResults(csvText);
+        downloadCSVBtn.disabled = false;
+        updateStatus('Analysis complete!', 'success');
+    } catch (error) {
+        updateStatus(`Analysis error: ${error.message}`, 'error');
+        console.error(error);
+    } finally {
+        runAnalysisBtn.disabled = false;
+    }
+});
+
+// Download CSV handler
+downloadCSVBtn.addEventListener('click', () => {
+    if (!csvText) return;
+    
+    const blob = new Blob([csvText], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'analysis_results.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    updateStatus('CSV downloaded!', 'success');
+});
+
+// Initialize NGL Viewer
+function initNGLViewer() {
+    try {
+        nglStage = new NGL.Stage('nglViewport', {
+            backgroundColor: 'white'
+        });
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            nglStage.handleResize();
+        });
+        
+        updateStatus('NGL Viewer ready.', 'success');
+    } catch (error) {
+        updateStatus(`NGL initialization error: ${error.message}`, 'error');
+        console.error(error);
+    }
+}
+
+// Load PDB into NGL Viewer
+async function loadPDBIntoNGL(pdbText) {
+    if (!nglStage) {
+        throw new Error('NGL stage not initialized');
+    }
+    
+    // Remove existing components
+    nglStage.removeAllComponents();
+    
+    // Create a blob from the PDB text
+    const blob = new Blob([pdbText], { type: 'text/plain' });
+    
+    // Load the structure
+    const component = await nglStage.loadFile(blob, { ext: 'pdb' });
+    
+    // Add representation
+    component.addRepresentation('cartoon', {
+        colorScheme: 'chainname'
+    });
+    
+    // Auto-center and zoom
+    component.autoView();
+    
+    return component;
+}
+
+// Load Pyodide and analyzer module
+async function loadPyodideOnce() {
+    if (pyodide) return pyodide;
+    
+    try {
+        // Load Pyodide
+        pyodide = await loadPyodide({
+            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.25.1/full/'
+        });
+        
+        // Load the analyzer.py module
+        const analyzerResponse = await fetch('./py/analyzer.py');
+        if (!analyzerResponse.ok) {
+            throw new Error('Failed to load analyzer.py');
+        }
+        const analyzerCode = await analyzerResponse.text();
+        
+        // Run the Python code to define the functions
+        pyodide.runPython(analyzerCode);
+        
+        updateStatus('Pyodide runtime loaded.', 'success');
+        return pyodide;
+    } catch (error) {
+        updateStatus(`Pyodide loading error: ${error.message}`, 'error');
+        console.error(error);
+        throw error;
+    }
+}
+
+// Run Python analysis on PDB text
+async function runPythonAnalysis(pdbText) {
+    if (!pyodide) {
+        throw new Error('Pyodide not loaded');
+    }
+    
+    try {
+        // Set the PDB text as a global variable in Python
+        pyodide.globals.set('pdb_text', pdbText);
+        
+        // Call the run_analysis function
+        const csvOutput = pyodide.runPython('run_analysis(pdb_text)');
+        
+        return csvOutput;
+    } catch (error) {
+        throw new Error(`Python execution error: ${error.message}`);
+    }
+}
+
+// Display CSV results in Tabulator table
+function displayCSVResults(csvText) {
+    // Parse CSV with PapaParse
+    const parsed = Papa.parse(csvText, {
+        header: true,
+        skipEmptyLines: true
+    });
+    
+    if (parsed.errors.length > 0) {
+        console.warn('CSV parsing warnings:', parsed.errors);
+    }
+    
+    const data = parsed.data;
+    
+    if (!data || data.length === 0) {
+        updateStatus('No data in analysis results', 'error');
+        return;
+    }
+    
+    // Hide the "no results" message
+    noResultsDiv.style.display = 'none';
+    
+    // Infer columns from the first row
+    const columns = Object.keys(data[0]).map(key => ({
+        title: key,
+        field: key,
+        headerFilter: 'input',
+        sorter: 'string'
+    }));
+    
+    // Destroy existing table if present
+    if (resultsTable) {
+        resultsTable.destroy();
+    }
+    
+    // Create new Tabulator table
+    resultsTable = new Tabulator('#resultsTable', {
+        data: data,
+        columns: columns,
+        layout: 'fitColumns',
+        pagination: 'local',
+        paginationSize: 20,
+        paginationSizeSelector: [10, 20, 50, 100],
+        movableColumns: true,
+        resizableRows: true,
+        responsiveLayout: 'collapse',
+        tooltips: true,
+        initialSort: [
+            { column: columns[0].field, dir: 'asc' }
+        ]
+    });
+}
+
+// Update status message
+function updateStatus(message, type = 'info') {
+    statusMessage.textContent = message;
+    statusArea.className = 'status-area';
+    if (type) {
+        statusArea.classList.add(type);
+    }
+}

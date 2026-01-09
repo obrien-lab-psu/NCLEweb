@@ -565,6 +565,9 @@ class GaussianEntanglement:
         #print(f'ref_allatoms_dups: {ref_allatoms_dups} {len(ref_allatoms_dups)}')
 
         chains_to_analyze = set(ref_univ.segments.segids)
+        
+        ## Initialize list to collect results from all chains
+        all_chains_results = []
 
         for chain in chains_to_analyze:
 
@@ -675,9 +678,8 @@ class GaussianEntanglement:
                 
                 ## If there is Native entanglement then save a file
                 if ent_result: 
-                    outfile = os.path.join(f'{outdir}', f'{pdb}_GE.txt')
                     #print(f'WRITING: {outfile}')
-                    outdf = {'ID':[], 'i':[], 'j': [], 'crossingsN': [], 'crossingsC': [], 'gn':[], 'gc':[], 'GLNn':[], 'GLNc':[], 'TLNn':[], 'TLNc':[], 'CCbond':[]}
+                    outdf = {'ID':[], 'chain':[], 'i':[], 'j': [], 'crossingsN': [], 'crossingsC': [], 'gn':[], 'gc':[], 'GLNn':[], 'GLNc':[], 'TLNn':[], 'TLNc':[], 'CCbond':[]}
 
                     for ij_gN_gC, crossings in ent_result.items():
                         # print(f'ij_gN_gC: {ij_gN_gC} with crossings: {crossings}')
@@ -694,6 +696,7 @@ class GaussianEntanglement:
                         # print(f'Contact: ({i}, {j}) with GLNn: {GLNn} and GLNc: {GLNc} has crossings: {crossingsN} {crossingsC} and CCbond: {CCbond}')
 
                         outdf['ID'] += [ID]
+                        outdf['chain'] += [chain]
                         outdf['i'] += [i]
                         outdf['j'] += [j]
                         outdf['crossingsN'] += [crossingsN]
@@ -709,15 +712,12 @@ class GaussianEntanglement:
                     outdf = pd.DataFrame(outdf)
                     outdf['ENT'] = (outdf['TLNn'] != 0) | (outdf['TLNc'] != 0)
                     outdf = self.mark_absent_crossings(outdf)
-                    outdf.to_csv(outfile, sep='|', index=False)
-                    print(f'SAVED: {outfile}')
-                    ent_result = pd.read_csv(outfile, sep='|', dtype={'crossingsN': str, 'crossingsC': str})
+                    all_chains_results.append(outdf)
+                    print(f'Found {len(outdf)} entanglements for chain {chain}')
                 else:
-                    print(f'NO CONTACTS DETECTED for {pdb}')
-                    ent_result = pd.DataFrame({'ID':[], 'i':[], 'j': [], 'crossingsN': [], 'crossingsC': [], 'gn':[], 'gc':[], 'GLNn':[], 'GLNc':[], 'TLNn':[], 'TLNc':[], 'CCbond':[], 'ENT':[]})
-                    ent_result.to_csv(outfile, sep='|', index=False)
-                    print(f'SAVED: {outfile}')
-                    ent_result = pd.read_csv(outfile, sep='|', dtype={'c': str})
+                    print(f'NO CONTACTS DETECTED for {pdb} chain {chain}')
+                    ent_result = pd.DataFrame({'ID':[], 'chain':[], 'i':[], 'j': [], 'crossingsN': [], 'crossingsC': [], 'gn':[], 'gc':[], 'GLNn':[], 'GLNc':[], 'TLNn':[], 'TLNc':[], 'CCbond':[], 'ENT':[]})
+                    all_chains_results.append(ent_result)
                                 
                 if len(missing_residues):
                     print(f'WRITING: {pdb}_M.txt')
@@ -726,9 +726,21 @@ class GaussianEntanglement:
                         for m_res in missing_residues:
                             f.write(f"{m_res} ")
                         f.write("\n")
+        
+        ## Combine results from all chains
+        if all_chains_results:
+            combined_results = pd.concat(all_chains_results, ignore_index=True)
+            print(f'\nTotal entanglements across all chains: {len(combined_results)}')
+        else:
+            combined_results = pd.DataFrame({'ID':[], 'chain':[], 'i':[], 'j': [], 'crossingsN': [], 'crossingsC': [], 'gn':[], 'gc':[], 'GLNn':[], 'GLNc':[], 'TLNn':[], 'TLNc':[], 'CCbond':[], 'ENT':[]})
+        
+        ## Save combined results
+        outfile = os.path.join(f'{outdir}', f'{pdb}_GE.txt')
+        combined_results.to_csv(outfile, sep='|', index=False)
+        print(f'SAVED: {outfile}')
     
         ## Return a dictionary with the outfile and the results
-        return {'outfile':outfile, 'ent_result':ent_result}
+        return {'outfile':outfile, 'ent_result':combined_results}
             
 
     ##########################################################################################################################################################

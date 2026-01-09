@@ -175,6 +175,11 @@ function displayResults(data) {
     }
     
     showPage('results');
+    
+    // Ensure NGL viewer resizes properly after page is shown
+    setTimeout(() => {
+        if (nglStage) nglStage.handleResize();
+    }, 100);
 }
 
 function renderTable(data) {
@@ -185,32 +190,35 @@ function renderTable(data) {
     
     // Define columns
     const columns = [
-        { title: "ID", field: "ID", width: 100 },
-        { title: "i", field: "i", width: 80 },
-        { title: "j", field: "j", width: 80 },
-        { title: "Crossings N", field: "crossingsN", width: 150 },
-        { title: "Crossings C", field: "crossingsC", width: 150 },
-        { title: "gn", field: "gn", width: 100, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
-        { title: "gc", field: "gc", width: 100, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
-        { title: "GLNn", field: "GLNn", width: 80 },
-        { title: "GLNc", field: "GLNc", width: 80 },
-        { title: "TLNn", field: "TLNn", width: 80 },
-        { title: "TLNc", field: "TLNc", width: 80 },
-        { title: "CCbond", field: "CCbond", width: 100, formatter: "tickCross" },
-        { title: "ENT", field: "ENT", width: 80, formatter: "tickCross" }
+        { title: "ID", field: "ID", minWidth: 100, widthGrow: 1 },
+        { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+        { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+        { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+        { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+        { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+        { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+        { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+        { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+        { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+        { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+        { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
+        { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
+        { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
     ];
     
     // Create table
     resultsTable = new Tabulator(resultsTable_div, {
         data: data,
         columns: columns,
-        layout: "fitDataStretch",
+        layout: "fitData",
         pagination: true,
         paginationSize: 20,
         paginationSizeSelector: [10, 20, 50, 100],
         movableColumns: true,
+        resizableColumns: true,
         resizableRows: true,
-        height: "500px"
+        height: "600px",
+        tooltips: true
     });
 }
 
@@ -218,7 +226,7 @@ function handleDownloadCSV() {
     if (!resultsData) return;
     
     // Convert results to CSV
-    const headers = ['ID', 'i', 'j', 'crossingsN', 'crossingsC', 'gn', 'gc', 'GLNn', 'GLNc', 'TLNn', 'TLNc', 'CCbond', 'ENT'];
+    const headers = ['ID', 'chain', 'i', 'j', 'crossingsN', 'crossingsC', 'gn', 'gc', 'GLNn', 'GLNc', 'TLNn', 'TLNc', 'CCbond', 'ENT'];
     const rows = resultsData.results.map(row => 
         headers.map(header => {
             const value = row[header];

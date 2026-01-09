@@ -12,6 +12,8 @@ let resultsTable = null;
 let nglStage = null;
 let pdbFileContent = null;
 let isSpinning = false;
+let currentComponent = null;
+let availableChains = [];
 
 // DOM Elements
 const pdbFileInput = document.getElementById('pdbFile');
@@ -46,6 +48,18 @@ function setupEventListeners() {
     
     // Download CSV
     downloadCSV.addEventListener('click', handleDownloadCSV);
+    
+    // Chain selector (will be enabled when structure loads)
+    const chainSelect = document.getElementById('chainSelect');
+    if (chainSelect) {
+        chainSelect.addEventListener('change', handleChainChange);
+    }
+    
+    // Clear selection button
+    const clearSelectionBtn = document.getElementById('clearSelection');
+    if (clearSelectionBtn) {
+        clearSelectionBtn.addEventListener('click', clearEntanglementHighlight);
+    }
     
     // Drag and drop (optional enhancement)
     const uploadBox = document.querySelector('.upload-box');
@@ -218,7 +232,14 @@ function renderTable(data) {
         resizableColumns: true,
         resizableRows: true,
         height: "600px",
-        tooltips: true
+        tooltips: true,
+        selectable: 1,
+        selectableRollingSelection: false
+    });
+    
+    // Add row click handler for highlighting entanglements
+    resultsTable.on("rowClick", function(e, row){
+        highlightEntanglement(row.getData());
     });
 }
 
@@ -331,18 +352,23 @@ function loadStructureIntoNGL(pdbContent) {
     const blob = new Blob([pdbContent], { type: 'text/plain' });
     
     nglStage.loadFile(blob, { ext: 'pdb' }).then(component => {
-        // Add cartoon representation
+        currentComponent = component;
+        
+        // Get available chains (unique only)
+        const chainSet = new Set();
+        component.structure.eachChain(chain => {
+            chainSet.add(chain.chainname);
+        });
+        availableChains = Array.from(chainSet).sort();
+        
+        // Update chain selector
+        updateChainSelector();
+        
+        // Add cartoon representation (grey by default)
         component.addRepresentation('cartoon', {
-            color: 'chainindex',
+            color: 'grey',
             aspectRatio: 4,
             scale: 1.5
-        });
-        
-        // Add ball and stick for important residues
-        component.addRepresentation('ball+stick', {
-            sele: 'not backbone',
-            color: 'element',
-            scale: 0.3
         });
         
         // Center and zoom
@@ -353,4 +379,156 @@ function loadStructureIntoNGL(pdbContent) {
     }).catch(error => {
         console.error('Error loading structure:', error);
     });
+}
+
+function updateChainSelector() {
+    const chainSelect = document.getElementById('chainSelect');
+    if (!chainSelect) return;
+    
+    // Clear existing options
+    chainSelect.innerHTML = '<option value="all">All Chains</option>';
+    
+    // Add option for each chain
+    availableChains.forEach(chain => {
+        const option = document.createElement('option');
+        option.value = chain;
+        option.textContent = `Chain ${chain}`;
+        chainSelect.appendChild(option);
+    });
+    
+    // Enable selector if multiple chains
+    chainSelect.disabled = availableChains.length <= 1;
+}
+
+function handleChainChange(event) {
+    if (!currentComponent) return;
+    
+    const selectedChain = event.target.value;
+    
+    // Remove all existing representations
+    currentComponent.removeAllRepresentations();
+    
+    // Determine selection string
+    const sele = selectedChain === 'all' ? '' : `:${selectedChain}`;
+    
+    // Add cartoon representation for selected chain(s) - grey
+    currentComponent.addRepresentation('cartoon', {
+        sele: sele,
+        color: 'grey',
+        aspectRatio: 4,
+        scale: 1.5
+    });
+    
+    // Re-center view
+    currentComponent.autoView(sele);
+}
+
+function highlightEntanglement(rowData) {
+    if (!currentComponent) return;
+    
+    const chain = rowData.chain || '';
+    const i = parseInt(rowData.i);
+    const j = parseInt(rowData.j);
+    const crossingsN = rowData.crossingsN || '';
+    const crossingsC = rowData.crossingsC || '';
+    
+    // Parse crossing residues (comma-separated)
+    const parseResidues = (str) => {
+        if (!str || str === '') return [];
+        return str.split(',').map(r => parseInt(r.trim())).filter(r => !isNaN(r));
+    };
+    
+    const crossingResN = parseResidues(crossingsN);
+    const crossingResC = parseResidues(crossingsC);
+    const allCrossings = [...crossingResN, ...crossingResC];
+    
+    // Build selection strings
+    const chainSele = chain ? `:${chain}` : '';
+    
+    // Remove existing highlight representations (keep base cartoon/ball+stick)
+    currentComponent.reprList.forEach((repr, index) => {
+        if (repr.name && repr.name.startsWith('highlight_')) {
+            currentComponent.removeRepresentation(repr);
+        }
+    });
+    
+    // 1. Color residues i to j RED (cartoon)
+    const loopSele = `${chainSele} and ${i}-${j}`;
+    currentComponent.addRepresentation('cartoon', {
+        sele: loopSele,
+        color: 'red',
+        aspectRatio: 5,
+        scale: 1.8,
+        name: 'highlight_loop'
+    });
+    
+    // 2. Color crossing residues ±3 BLUE (cartoon)
+    if (allCrossings.length > 0) {
+        const crossingSelections = [];
+        allCrossings.forEach(res => {
+            const start = Math.max(1, res - 3);
+            const end = res + 3;
+            crossingSelections.push(`${start}-${end}`);
+        });
+        const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
+        currentComponent.addRepresentation('cartoon', {
+            sele: crossingSele,
+            color: 'blue',
+            aspectRatio: 5,
+            scale: 1.8,
+            name: 'highlight_crossings'
+        });
+    }
+    
+    // 3. Add VDW (spacefill) for i and j in RED
+    const loopEndsSele = `${chainSele} and (${i} or ${j})`;
+    currentComponent.addRepresentation('spacefill', {
+        sele: loopEndsSele,
+        color: 'red',
+        scale: 0.8,
+        name: 'highlight_vdw_loop'
+    });
+    
+    // 4. Add VDW (spacefill) for crossing residues in BLUE
+    if (allCrossings.length > 0) {
+        const crossingVdwSele = `${chainSele} and (${allCrossings.join(' or ')})`;
+        currentComponent.addRepresentation('spacefill', {
+            sele: crossingVdwSele,
+            color: 'blue',
+            scale: 0.8,
+            name: 'highlight_vdw_crossings'
+        });
+    }
+    
+    // Center view on the entanglement region
+    const viewSele = `${chainSele} and ${Math.min(i, ...allCrossings)}-${Math.max(j, ...allCrossings)}`;
+    currentComponent.autoView(viewSele, 500);
+    
+    console.log(`Highlighted entanglement: i=${i}, j=${j}, crossings=${allCrossings.join(',')}`);
+}
+
+function clearEntanglementHighlight() {
+    if (!currentComponent) return;
+    
+    // Remove all highlight representations
+    const reprToRemove = [];
+    currentComponent.reprList.forEach((repr) => {
+        if (repr.name && repr.name.startsWith('highlight_')) {
+            reprToRemove.push(repr);
+        }
+    });
+    
+    reprToRemove.forEach(repr => {
+        currentComponent.removeRepresentation(repr);
+    });
+    
+    // Deselect table row
+    if (resultsTable) {
+        resultsTable.deselectRow();
+    }
+    
+    // Reset view
+    currentComponent.autoView();
+    
+    console.log('Cleared entanglement highlight');
 }

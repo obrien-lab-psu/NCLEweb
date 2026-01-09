@@ -334,7 +334,7 @@ class GaussianEntanglement:
                 # print(f'Ncrossing_resids before filtering:', Ncrossing_resids)
                 filtered_crossingN_resids = []
                 for c in Ncrossing_resids:
-                    if abs(c) < (i - terminal_buff) and abs(c) > terminal_buff:
+                    if c < (i - terminal_buff - loop_buff) and c > terminal_buff:
                         filtered_crossingN_resids.append(c)
                 # print(f'Filtered crossings after checking termini and loop buffers: {filtered_crossingN_resids}')
 
@@ -374,7 +374,7 @@ class GaussianEntanglement:
                 # print(f'Ccrossing_resids before filtering:', Ccrossing_resids)
                 filtered_crossingC_resids = []
                 for c in Ccrossing_resids:
-                    if abs(c) > (j + terminal_buff) and abs(c) < (resids[-1] - terminal_buff):
+                    if c > (j + terminal_buff + loop_buff) and c < (resids[-1] - terminal_buff):
                         filtered_crossingC_resids.append(c)
 
                 # print(f'Filtered crossings after checking termini and loop buffers: {filtered_crossingC_resids}')

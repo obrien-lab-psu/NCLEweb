@@ -87,7 +87,14 @@
                         <h3>Structure Viewer</h3>
                         <div id="nglViewport" class="ngl-viewport"></div>
                         <div class="viewer-controls">
+                            <div class="chain-selector">
+                                <label for="chainSelect">Chain:</label>
+                                <select id="chainSelect" class="chain-select">
+                                    <option value="all">All Chains</option>
+                                </select>
+                            </div>
                             <button id="resetView" class="btn btn-secondary">Reset View</button>
+                            <button id="clearSelection" class="btn btn-secondary">Clear Selection</button>
                             <button id="toggleSpin" class="btn btn-secondary">Toggle Spin</button>
                         </div>
                     </div>

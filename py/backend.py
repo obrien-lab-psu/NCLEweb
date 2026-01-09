@@ -11,6 +11,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 import tempfile
 import os
+import shutil
 import sys
 import re
 import pandas as pd
@@ -223,11 +224,12 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str):
         # Update status to processing
         db.update_job_status(job_id, 'processing')
         
-        # Run analysis
-        result = calculate_native_ge(temp_pdb_path, cleanup=True)
+        # Run analysis (don't cleanup yet - we need to save the PDB file)
+        result = calculate_native_ge(temp_pdb_path, cleanup=False)
         
         if not result['success']:
-            # Job failed
+            # Job failed - cleanup temp file
+            os.remove(temp_pdb_path)
             db.update_job_status(job_id, 'failed', error_message=result['error'])
             
             # Get job info for email
@@ -242,6 +244,18 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str):
                 )
             session.close()
             return
+        
+        # Save PDB file to permanent storage: data/pdb_files/{job_id}/structure.pdb
+        pdb_dir = os.path.join('data', 'pdb_files', job_id)
+        os.makedirs(pdb_dir, exist_ok=True)
+        pdb_storage_path = os.path.join(pdb_dir, 'structure.pdb')
+        
+        # Copy temp file to permanent location
+        import shutil
+        shutil.copy2(temp_pdb_path, pdb_storage_path)
+        
+        # Cleanup temp file
+        os.remove(temp_pdb_path)
         
         # Save results to database
         db.save_results(job_id, result['data'], pdb_id=result['pdb_id'])
@@ -401,6 +415,16 @@ async def get_job_details(job_id: str):
         if not job_data:
             raise HTTPException(status_code=404, detail="Job not found")
         
+        # Read PDB content from filesystem if available
+        pdb_content = None
+        pdb_file_path = os.path.join('data', 'pdb_files', job_id, 'structure.pdb')
+        if os.path.exists(pdb_file_path):
+            try:
+                with open(pdb_file_path, 'r') as f:
+                    pdb_content = f.read()
+            except Exception as e:
+                print(f"Error reading PDB file: {e}")
+        
         return JSONResponse(content={
             'success': True,
             'pdb_id': job_data['job']['pdb_id'],
@@ -414,7 +438,7 @@ async def get_job_details(job_id: str):
             'num_chains': job_data['job']['num_chains'],
             'results': job_data['results'],
             'error_message': job_data['job'].get('error_message'),
-            'pdb_content': None  # PDB files are not stored after processing
+            'pdb_content': pdb_content
         })
     except HTTPException:
         raise

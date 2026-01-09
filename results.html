@@ -159,10 +159,6 @@
                         <div class="job-info-value" id="jobStatus">-</div>
                     </div>
                     <div class="job-info-item">
-                        <div class="job-info-label">PDB ID</div>
-                        <div class="job-info-value" id="pdbId">-</div>
-                    </div>
-                    <div class="job-info-item">
                         <div class="job-info-label">UniProt ID</div>
                         <div class="job-info-value" id="uniprotId">-</div>
                     </div>
@@ -290,7 +286,6 @@
             
             // Fill job info
             document.getElementById('jobName').textContent = data.job_name || '-';
-            document.getElementById('pdbId').textContent = data.pdb_id || '-';
             document.getElementById('uniprotId').textContent = data.uniprot_id || '-';
             document.getElementById('submittedAt').textContent = formatDate(data.created_at);
             document.getElementById('completedAt').textContent = formatDate(data.completed_at);
@@ -338,10 +333,6 @@
                 <div class="stat-card">
                     <div class="stat-value">${chains.length}</div>
                     <div class="stat-label">Chains</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">${data.pdb_id || 'N/A'}</div>
-                    <div class="stat-label">Structure ID</div>
                 </div>
             `;
             document.getElementById('resultsStats').innerHTML = statsHTML;
@@ -399,60 +390,51 @@
 
         // Render Tabulator table
         function renderTable(data) {
-            // Transform data for display
-            const tableData = data.map((row, index) => ({
-                id: index + 1,
-                chain: row.chain,
-                i: row.i,
-                j: row.j,
-                g: parseFloat(row.g).toFixed(3),
-                GN: row.GN,
-                delta_GN: row.delta_GN,
-                crossingsN: row.crossingsN || [],
-                crossingsC: row.crossingsC || []
-            }));
+            const columns = [
+                { title: "ID", field: "ID", minWidth: 100, widthGrow: 1 },
+                { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+                { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+                { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+                { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+                { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+                { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
+                { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
+                { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+            ];
 
             resultsTable = new Tabulator("#resultsTable", {
-                data: tableData,
-                layout: "fitDataStretch",
-                pagination: "local",
-                paginationSize: 25,
-                paginationSizeSelector: [10, 25, 50, 100],
+                data: data,
+                columns: columns,
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
                 movableColumns: true,
+                resizableColumns: true,
                 resizableRows: true,
+                height: "600px",
+                tooltips: true,
                 selectable: 1,
-                columns: [
-                    {title: "#", field: "id", width: 60, frozen: true},
-                    {title: "Chain", field: "chain", width: 80},
-                    {title: "i", field: "i", width: 80},
-                    {title: "j", field: "j", width: 80},
-                    {title: "G", field: "g", width: 100},
-                    {title: "GN", field: "GN", width: 80},
-                    {title: "ΔGN", field: "delta_GN", width: 80},
-                    {
-                        title: "Crossings N",
-                        field: "crossingsN",
-                        width: 200,
-                        formatter: (cell) => {
-                            const value = cell.getValue();
-                            return Array.isArray(value) ? value.join(", ") : "";
-                        }
-                    },
-                    {
-                        title: "Crossings C",
-                        field: "crossingsC",
-                        width: 200,
-                        formatter: (cell) => {
-                            const value = cell.getValue();
-                            return Array.isArray(value) ? value.join(", ") : "";
-                        }
-                    }
-                ]
+                selectableRollingSelection: false
             });
 
             // Handle row selection
             resultsTable.on("rowClick", function(e, row) {
                 const rowData = row.getData();
+                
+                // Update chain selector to match the selected row's chain
+                const chainSelect = document.getElementById('chainSelect');
+                if (chainSelect && currentChain === 'all') {
+                    // Only auto-switch if "All Chains" is selected
+                    chainSelect.value = rowData.chain;
+                    currentChain = rowData.chain;
+                }
+                
                 highlightEntanglement(rowData);
             });
         }
@@ -504,6 +486,9 @@
                 currentChain = e.target.value;
                 updateChainDisplay();
             });
+            
+            // Set initial currentChain value
+            currentChain = chainSelect.value;
         }
 
         // Update chain display
@@ -534,38 +519,84 @@
             // Remove previous highlights
             component.removeAllRepresentations();
             
-            // Base cartoon
-            component.addRepresentation("cartoon", {
-                colorScheme: "chainname",
-                opacity: 0.3
-            });
-            
-            // Highlight loop (i to j) in the specified chain
-            component.addRepresentation("cartoon", {
-                sele: `${rowData.i}-${rowData.j}:${rowData.chain}`,
-                color: "green"
-            });
-            
-            // Highlight i and j residues with red VDW spheres
-            component.addRepresentation("spacefill", {
-                sele: `${rowData.i}:${rowData.chain} or ${rowData.j}:${rowData.chain}`,
-                color: "red",
-                scale: 1.0
-            });
-            
-            // Highlight crossing residues with blue VDW spheres
-            const crossings = [...rowData.crossingsN, ...rowData.crossingsC];
-            if (crossings.length > 0) {
-                const crossingSele = crossings.map(c => `${c}:${rowData.chain}`).join(' or ');
-                component.addRepresentation("spacefill", {
-                    sele: crossingSele,
-                    color: "blue",
-                    scale: 1.0
+            // 1. Base cartoon - show based on chain selection in grey
+            if (currentChain === 'all') {
+                // Show all chains in grey
+                component.addRepresentation("cartoon", {
+                    color: "grey",
+                    opacity: 0.3
+                });
+            } else {
+                // Show only selected chain in grey
+                component.addRepresentation("cartoon", {
+                    sele: `:${currentChain}`,
+                    color: "grey",
+                    opacity: 0.3
                 });
             }
             
-            // Center view on the loop
-            component.autoView(`${rowData.i}-${rowData.j}:${rowData.chain}`, 500);
+            // Parse crossings (stored as comma-separated strings like "+396, +400")
+            const crossingsN = rowData.crossingsN ? rowData.crossingsN.split(',').map(s => {
+                const num = s.trim().replace(/[+\-]/g, '');
+                return parseInt(num);
+            }).filter(n => !isNaN(n)) : [];
+            
+            const crossingsC = rowData.crossingsC ? rowData.crossingsC.split(',').map(s => {
+                const num = s.trim().replace(/[+\-]/g, '');
+                return parseInt(num);
+            }).filter(n => !isNaN(n)) : [];
+            
+            const allCrossings = [...crossingsN, ...crossingsC];
+            
+            // 2. Highlight loop (i to j) in BRIGHT RED cartoon
+            const chainSele = `:${rowData.chain}`;
+            component.addRepresentation("cartoon", {
+                sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
+                color: "#FF0000",  // Bright red
+                aspectRatio: 5,
+                scale: 1.8,
+                opacity: 1.0
+            });
+            
+            // 3. Highlight crossing residues +/- 3 in BRIGHT BLUE cartoon
+            if (allCrossings.length > 0) {
+                const crossingSelections = [];
+                allCrossings.forEach(res => {
+                    const start = res - 3;
+                    const end = res + 3;
+                    crossingSelections.push(`${start}-${end}`);
+                });
+                const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
+                component.addRepresentation('cartoon', {
+                    sele: crossingSele,
+                    color: '#0000FF',  // Bright blue
+                    aspectRatio: 5,
+                    scale: 1.8,
+                    opacity: 1.0
+                });
+            }
+            
+            // 4. Add VDW (spacefill) for i and j in BRIGHT RED
+            component.addRepresentation("spacefill", {
+                sele: `${chainSele} and (${rowData.i} or ${rowData.j})`,
+                color: "#FF0000",  // Bright red
+                scale: 0.8
+            });
+            
+            // 5. Add VDW (spacefill) for crossing residues in BRIGHT BLUE
+            if (allCrossings.length > 0) {
+                const crossingVdwSele = `${chainSele} and (${allCrossings.join(' or ')})`;
+                component.addRepresentation('spacefill', {
+                    sele: crossingVdwSele,
+                    color: '#0000FF',  // Bright blue
+                    scale: 0.8
+                });
+            }
+            
+            // Center view on the entanglement region
+            const minRes = Math.min(rowData.i, ...allCrossings);
+            const maxRes = Math.max(rowData.j, ...allCrossings);
+            component.autoView(`${chainSele} and ${minRes}-${maxRes}`, 500);
         }
 
         // Reset view
@@ -592,16 +623,22 @@
 
         // Download CSV
         function downloadCSV(data, pdbId) {
-            const headers = ['Chain', 'i', 'j', 'G', 'GN', 'ΔGN', 'Crossings_N', 'Crossings_C'];
+            const headers = ['ID', 'chain', 'i', 'j', 'crossingsN', 'crossingsC', 'gn', 'gc', 'GLNn', 'GLNc', 'TLNn', 'TLNc', 'CCbond', 'ENT'];
             const rows = data.map(row => [
+                row.ID || '',
                 row.chain,
                 row.i,
                 row.j,
-                row.g,
-                row.GN,
-                row.delta_GN,
-                (row.crossingsN || []).join('; '),
-                (row.crossingsC || []).join('; ')
+                row.crossingsN || '',
+                row.crossingsC || '',
+                row.gn,
+                row.gc,
+                row.GLNn,
+                row.GLNc,
+                row.TLNn,
+                row.TLNc,
+                row.CCbond,
+                row.ENT
             ]);
             
             let csvContent = headers.join(',') + '\n';

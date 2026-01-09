@@ -225,7 +225,7 @@
             </div>
             
             <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="window.location.href='landing.html'">
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='index.html'">
                     Cancel
                 </button>
                 <button type="submit" class="btn btn-primary" id="submitBtn">
@@ -276,14 +276,14 @@
                 
                 if (response.ok && data.success) {
                     showStatus(
-                        `Success! Job submitted with ID: ${data.job_id}. You will receive an email when processing is complete.`,
+                        `Success! Job submitted. Redirecting to results page...`,
                         'success'
                     );
                     
-                    // Redirect to browse page after 3 seconds
+                    // Redirect to results page after 2 seconds
                     setTimeout(() => {
-                        window.location.href = `browse.html?highlight=${data.job_id}`;
-                    }, 3000);
+                        window.location.href = `results.html?job_id=${data.job_id}`;
+                    }, 2000);
                 } else {
                     showStatus(`Error: ${data.detail || 'Submission failed'}`, 'error');
                     submitBtn.disabled = false;

@@ -15,6 +15,7 @@ backend.log
 # Database (keep structure, not data)
 data/*.db
 data/*.json
+data/pdb_files/
 
 # OS
 .DS_Store

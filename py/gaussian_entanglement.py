@@ -442,26 +442,28 @@ class GaussianEntanglement:
             crossingsN, crossingsC = crossings
 
             if crossingsN.size:
-                check_crossing = []
+                crossings_to_remove = []
                 for crossing in crossingsN:
                     reg_exp = re.split("\\+|-", crossing, maxsplit=1) # split the chirality
-                    check_crossing.append(np.arange(int(reg_exp[1]) - 10 , int(reg_exp[1]) + 11))
-                check_crossing = np.concatenate(check_crossing)
-                missing_res_cr = np.intersect1d(check_crossing, missing_res)
-
-                if missing_res_cr.size:
-                    crossingsN.remove(crossing)
+                    check_crossing = np.arange(int(reg_exp[1]) - 10 , int(reg_exp[1]) + 11)
+                    missing_res_cr = np.intersect1d(check_crossing, missing_res)
+                    if missing_res_cr.size:
+                        crossings_to_remove.append(crossing)
+                
+                # Filter out crossings that have missing residues
+                crossingsN = np.array([c for c in crossingsN if c not in crossings_to_remove])
 
             if crossingsC.size:
-                check_crossing = []
+                crossings_to_remove = []
                 for crossing in crossingsC:
                     reg_exp = re.split("\\+|-", crossing, maxsplit=1) # split the chirality
-                    check_crossing.append(np.arange(int(reg_exp[1]) - 10 , int(reg_exp[1]) + 11))
-                check_crossing = np.concatenate(check_crossing)
-                missing_res_cr = np.intersect1d(check_crossing, missing_res)
-
-                if missing_res_cr.size:
-                    crossingsC.remove(crossing)
+                    check_crossing = np.arange(int(reg_exp[1]) - 10 , int(reg_exp[1]) + 11)
+                    missing_res_cr = np.intersect1d(check_crossing, missing_res)
+                    if missing_res_cr.size:
+                        crossings_to_remove.append(crossing)
+                
+                # Filter out crossings that have missing residues
+                crossingsC = np.array([c for c in crossingsC if c not in crossings_to_remove])
 
             filtered_entanglements[ij_gN_gC] = [crossingsN, crossingsC]
 

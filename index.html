@@ -6,6 +6,9 @@
     <title>NCLE - Native Gaussian Entanglement Analyzer</title>
     <link rel="stylesheet" href="styles.css">
     
+    <!-- NGL Viewer -->
+    <script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+    
     <!-- Tabulator for interactive tables -->
     <link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css" rel="stylesheet">
     <script src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
@@ -78,12 +81,28 @@
                     <!-- Stats will be inserted here -->
                 </div>
                 
-                <div id="resultsTable" class="table-container">
-                    <!-- Tabulator table will be rendered here -->
-                </div>
-                
-                <div id="noResults" class="no-results" style="display: none;">
-                    <p>No entanglements detected in this structure.</p>
+                <div class="results-content">
+                    <!-- Structure Viewer -->
+                    <div class="viewer-section">
+                        <h3>Structure Viewer</h3>
+                        <div id="nglViewport" class="ngl-viewport"></div>
+                        <div class="viewer-controls">
+                            <button id="resetView" class="btn btn-secondary">Reset View</button>
+                            <button id="toggleSpin" class="btn btn-secondary">Toggle Spin</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Table -->
+                    <div class="table-section">
+                        <h3>Entanglement Data</h3>
+                        <div id="resultsTable" class="table-container">
+                            <!-- Tabulator table will be rendered here -->
+                        </div>
+                        
+                        <div id="noResults" class="no-results" style="display: none;">
+                            <p>No entanglements detected in this structure.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,11 +1,17 @@
 // API Configuration
-// Use relative URL so it works both locally (with proxy) and in production
-const API_BASE_URL = window.location.origin;
+// Use relative URL for production (served by Apache)
+// Use localhost for local file:// testing
+const API_BASE_URL = window.location.protocol === 'file:' 
+    ? 'http://127.0.0.1:8000' 
+    : window.location.origin;
 
 // Global state
 let selectedFile = null;
 let resultsData = null;
 let resultsTable = null;
+let nglStage = null;
+let pdbFileContent = null;
+let isSpinning = false;
 
 // DOM Elements
 const pdbFileInput = document.getElementById('pdbFile');
@@ -25,6 +31,7 @@ const resultsTitle = document.getElementById('resultsTitle');
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
+    initNGLViewer();
 });
 
 function setupEventListeners() {
@@ -81,6 +88,14 @@ function handleFileSelect() {
     }
     
     selectedFile = file;
+    
+    // Read file content for later use in NGL viewer
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        pdbFileContent = e.target.result;
+    };
+    reader.readAsText(file);
+    
     fileName.textContent = `Selected: ${file.name} (${formatFileSize(file.size)})`;
     fileName.style.display = 'block';
     analyzeBtn.disabled = false;
@@ -152,6 +167,11 @@ function displayResults(data) {
         noResults.style.display = 'none';
         resultsTable_div.style.display = 'block';
         renderTable(data.results);
+    }
+    
+    // Load structure into NGL viewer
+    if (pdbFileContent) {
+        loadStructureIntoNGL(pdbFileContent);
     }
     
     showPage('results');
@@ -227,10 +247,17 @@ function handleDownloadCSV() {
 function resetToUpload() {
     selectedFile = null;
     resultsData = null;
+    pdbFileContent = null;
     pdbFileInput.value = '';
     fileName.textContent = '';
     fileName.style.display = 'none';
     analyzeBtn.disabled = true;
+    
+    // Clear NGL viewer
+    if (nglStage) {
+        nglStage.removeAllComponents();
+    }
+    
     showPage('upload');
 }
 
@@ -244,4 +271,78 @@ function formatFileSize(bytes) {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// ===== NGL Viewer Functions =====
+
+function initNGLViewer() {
+    const viewport = document.getElementById('nglViewport');
+    if (!viewport) return;
+    
+    nglStage = new NGL.Stage(viewport, {
+        backgroundColor: 'white',
+        quality: 'high',
+        sampleLevel: 2
+    });
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        if (nglStage) nglStage.handleResize();
+    });
+    
+    // Set up viewer controls
+    const resetViewBtn = document.getElementById('resetView');
+    const toggleSpinBtn = document.getElementById('toggleSpin');
+    
+    if (resetViewBtn) {
+        resetViewBtn.addEventListener('click', () => {
+            if (nglStage) {
+                nglStage.autoView();
+            }
+        });
+    }
+    
+    if (toggleSpinBtn) {
+        toggleSpinBtn.addEventListener('click', () => {
+            if (nglStage) {
+                isSpinning = !isSpinning;
+                nglStage.setSpin(isSpinning);
+                toggleSpinBtn.textContent = isSpinning ? 'Stop Spin' : 'Toggle Spin';
+            }
+        });
+    }
+}
+
+function loadStructureIntoNGL(pdbContent) {
+    if (!nglStage || !pdbContent) return;
+    
+    // Clear existing structures
+    nglStage.removeAllComponents();
+    
+    // Load PDB from string
+    const blob = new Blob([pdbContent], { type: 'text/plain' });
+    
+    nglStage.loadFile(blob, { ext: 'pdb' }).then(component => {
+        // Add cartoon representation
+        component.addRepresentation('cartoon', {
+            color: 'chainindex',
+            aspectRatio: 4,
+            scale: 1.5
+        });
+        
+        // Add ball and stick for important residues
+        component.addRepresentation('ball+stick', {
+            sele: 'not backbone',
+            color: 'element',
+            scale: 0.3
+        });
+        
+        // Center and zoom
+        component.autoView();
+        
+        // Optional: add subtle spin
+        nglStage.setSpin(false);
+    }).catch(error => {
+        console.error('Error loading structure:', error);
+    });
 }

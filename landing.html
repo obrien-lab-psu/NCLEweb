@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NCLE - Native Gaussian Entanglement Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .landing-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        .hero {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            margin-bottom: 40px;
+        }
+        
+        .hero h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+        
+        .hero p {
+            font-size: 1.3em;
+            opacity: 0.9;
+        }
+        
+        .action-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .action-card {
+            background: white;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+        
+        .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+        
+        .action-card-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+        
+        .action-card h2 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .action-card p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 25px;
+        }
+        
+        .action-card button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .action-card button:hover {
+            background: #5568d3;
+        }
+        
+        .features {
+            margin-top: 60px;
+            text-align: center;
+        }
+        
+        .features h2 {
+            font-size: 2em;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+        
+        .feature-item {
+            padding: 20px;
+        }
+        
+        .feature-item h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .feature-item p {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <div class="hero">
+            <h1>NCLE</h1>
+            <p>Native Gaussian Entanglement Analyzer</p>
+            <p style="font-size: 0.9em; margin-top: 10px;">Analyze protein structures for native covalent loop entanglements</p>
+        </div>
+        
+        <div class="action-cards">
+            <div class="action-card" onclick="window.location.href='submit.html'">
+                <div class="action-card-icon">🧬</div>
+                <h2>Submit New Analysis</h2>
+                <p>Upload your PDB structure file and receive detailed entanglement analysis via email</p>
+                <button>Get Started</button>
+            </div>
+            
+            <div class="action-card" onclick="window.location.href='browse.html'">
+                <div class="action-card-icon">📊</div>
+                <h2>Browse Results</h2>
+                <p>View previously analyzed structures and explore the entanglement database</p>
+                <button>Browse Database</button>
+            </div>
+        </div>
+        
+        <div class="features">
+            <h2>Features</h2>
+            <div class="feature-grid">
+                <div class="feature-item">
+                    <h3>Multi-Chain Support</h3>
+                    <p>Analyze complex structures with multiple protein chains</p>
+                </div>
+                <div class="feature-item">
+                    <h3>Interactive 3D Visualization</h3>
+                    <p>Explore entanglements with NGL molecular viewer</p>
+                </div>
+                <div class="feature-item">
+                    <h3>Email Notifications</h3>
+                    <p>Receive results directly to your inbox when analysis completes</p>
+                </div>
+                <div class="feature-item">
+                    <h3>Permanent Storage</h3>
+                    <p>Access your results anytime with unique job IDs</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

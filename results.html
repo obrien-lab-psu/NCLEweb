@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analysis Results - NCLE</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- NGL Viewer -->
+    <script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+    
+    <!-- Tabulator for interactive tables -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
+    
+    <style>
+        .job-info-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .job-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .job-info-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .job-info-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        
+        .job-info-value {
+            font-size: 1rem;
+            color: #333;
+            word-break: break-word;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-pending {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 24px 0;
+            color: #721c24;
+        }
+        
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+        
+        .breadcrumb {
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+        
+        .breadcrumb a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        
+        .breadcrumb span {
+            color: #666;
+            margin: 0 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="resultsPage" class="page">
+            <header>
+                <h1>Analysis Results</h1>
+                <div class="breadcrumb">
+                    <a href="index.html">Home</a>
+                    <span>/</span>
+                    <a href="browse.html">Browse Jobs</a>
+                    <span>/</span>
+                    <span id="breadcrumbJobName">Results</span>
+                </div>
+            </header>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-container">
+                <div class="spinner"></div>
+                <p>Loading results...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" style="display: none;">
+                <div class="error-message">
+                    <h3>Error Loading Results</h3>
+                    <p id="errorMessage"></p>
+                </div>
+                <button onclick="window.location.href='browse.html'" class="btn btn-primary">
+                    Return to Browse
+                </button>
+            </div>
+
+            <!-- Job Info Section -->
+            <div id="jobInfoSection" class="job-info-section" style="display: none;">
+                <h2>Job Information</h2>
+                <div class="job-info-grid">
+                    <div class="job-info-item">
+                        <div class="job-info-label">Job Name</div>
+                        <div class="job-info-value" id="jobName">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">Status</div>
+                        <div class="job-info-value" id="jobStatus">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">PDB ID</div>
+                        <div class="job-info-value" id="pdbId">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">UniProt ID</div>
+                        <div class="job-info-value" id="uniprotId">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">Submitted</div>
+                        <div class="job-info-value" id="submittedAt">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">Completed</div>
+                        <div class="job-info-value" id="completedAt">-</div>
+                    </div>
+                </div>
+                <div class="job-info-item" style="margin-top: 16px;" id="descriptionContainer">
+                    <div class="job-info-label">Description</div>
+                    <div class="job-info-value" id="jobDescription">-</div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2 id="resultsTitle">Entanglement Results</h2>
+                    <div class="results-actions">
+                        <button id="downloadCSV" class="btn btn-primary">Download CSV</button>
+                        <button onclick="window.location.href='browse.html'" class="btn btn-secondary">
+                            Return to Browse
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="resultsStats" class="stats-row">
+                    <!-- Stats will be inserted here -->
+                </div>
+                
+                <div class="results-content">
+                    <!-- Structure Viewer -->
+                    <div class="viewer-section">
+                        <h3>Structure Viewer</h3>
+                        <div id="nglViewport" class="ngl-viewport"></div>
+                        <div class="viewer-controls">
+                            <div class="chain-selector">
+                                <label for="chainSelect">Chain:</label>
+                                <select id="chainSelect" class="chain-select">
+                                    <option value="all">All Chains</option>
+                                </select>
+                            </div>
+                            <button id="resetView" class="btn btn-secondary">Reset View</button>
+                            <button id="clearSelection" class="btn btn-secondary">Clear Selection</button>
+                            <button id="toggleSpin" class="btn btn-secondary">Toggle Spin</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Results Table -->
+                    <div class="table-section">
+                        <h3>Entanglement Data</h3>
+                        <div id="resultsTable" class="table-container">
+                            <!-- Tabulator table will be rendered here -->
+                        </div>
+                        
+                        <div id="noResults" class="no-results" style="display: none;">
+                            <p>No entanglements detected in this structure.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:8000';
+        let jobId = null;
+        let jobData = null;
+        let resultsTable = null;
+        let nglStage = null;
+        let pdbFileContent = null;
+        let currentChain = 'all';
+        let isSpinning = false;
+
+        // Get job_id from URL parameter
+        function getJobIdFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('job_id');
+        }
+
+        // Format date string
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        // Load job data from API
+        async function loadJobData() {
+            jobId = getJobIdFromURL();
+            
+            if (!jobId) {
+                showError('No job ID provided in URL');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load job data: ${response.statusText}`);
+                }
+
+                jobData = await response.json();
+                displayJobData(jobData);
+                
+            } catch (error) {
+                console.error('Error loading job:', error);
+                showError(error.message);
+            }
+        }
+
+        // Display job data
+        function displayJobData(data) {
+            // Hide loading, show content
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('jobInfoSection').style.display = 'block';
+            
+            // Update breadcrumb
+            document.getElementById('breadcrumbJobName').textContent = data.job_name || 'Results';
+            
+            // Fill job info
+            document.getElementById('jobName').textContent = data.job_name || '-';
+            document.getElementById('pdbId').textContent = data.pdb_id || '-';
+            document.getElementById('uniprotId').textContent = data.uniprot_id || '-';
+            document.getElementById('submittedAt').textContent = formatDate(data.created_at);
+            document.getElementById('completedAt').textContent = formatDate(data.completed_at);
+            
+            // Status badge
+            const statusElement = document.getElementById('jobStatus');
+            const statusClass = `status-${data.status}`;
+            statusElement.innerHTML = `<span class="status-badge ${statusClass}">${data.status}</span>`;
+            
+            // Description
+            if (data.description) {
+                document.getElementById('jobDescription').textContent = data.description;
+            } else {
+                document.getElementById('descriptionContainer').style.display = 'none';
+            }
+            
+            // Handle different job statuses
+            if (data.status === 'completed' && data.results) {
+                displayResults(data);
+            } else if (data.status === 'failed') {
+                showError(data.error_message || 'Job processing failed');
+            } else if (data.status === 'processing' || data.status === 'pending') {
+                showProcessingMessage();
+            }
+        }
+
+        // Display results
+        function displayResults(data) {
+            document.getElementById('resultsSection').style.display = 'block';
+            
+            // Update title
+            document.getElementById('resultsTitle').textContent = 
+                `Entanglement Results - ${data.pdb_id || 'Structure'}`;
+            
+            // Display stats
+            const results = data.results || [];
+            const numEntanglements = results.length;
+            const chains = [...new Set(results.map(r => r.chain))];
+            
+            const statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${numEntanglements}</div>
+                    <div class="stat-label">Total Entanglements</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${chains.length}</div>
+                    <div class="stat-label">Chains</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.pdb_id || 'N/A'}</div>
+                    <div class="stat-label">Structure ID</div>
+                </div>
+            `;
+            document.getElementById('resultsStats').innerHTML = statsHTML;
+            
+            // Show/hide results based on data
+            if (numEntanglements === 0) {
+                document.getElementById('noResults').style.display = 'block';
+                document.getElementById('resultsTable').style.display = 'none';
+            } else {
+                document.getElementById('noResults').style.display = 'none';
+                document.getElementById('resultsTable').style.display = 'block';
+                renderTable(results);
+            }
+            
+            // Load structure into NGL viewer if PDB content is available
+            if (data.pdb_content) {
+                pdbFileContent = data.pdb_content;
+                loadStructureIntoNGL(pdbFileContent);
+            } else {
+                // PDB content not stored, show message
+                document.querySelector('.viewer-section').innerHTML = `
+                    <h3>Structure Viewer</h3>
+                    <div class="no-results">
+                        <p>3D structure visualization not available for this job.</p>
+                        <p style="font-size: 0.9rem; color: #666;">PDB files are not permanently stored after processing.</p>
+                    </div>
+                `;
+            }
+            
+            // Setup download CSV button
+            document.getElementById('downloadCSV').onclick = () => downloadCSV(results, data.pdb_id);
+        }
+
+        // Show processing message
+        function showProcessingMessage() {
+            document.getElementById('resultsSection').style.display = 'block';
+            document.getElementById('resultsStats').innerHTML = `
+                <div class="stat-card" style="grid-column: 1 / -1;">
+                    <div class="stat-label">Job is currently being processed. Please check back later.</div>
+                    <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 16px;">
+                        Refresh Page
+                    </button>
+                </div>
+            `;
+        }
+
+        // Show error
+        function showError(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('jobInfoSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            document.getElementById('errorMessage').textContent = message;
+        }
+
+        // Render Tabulator table
+        function renderTable(data) {
+            // Transform data for display
+            const tableData = data.map((row, index) => ({
+                id: index + 1,
+                chain: row.chain,
+                i: row.i,
+                j: row.j,
+                g: parseFloat(row.g).toFixed(3),
+                GN: row.GN,
+                delta_GN: row.delta_GN,
+                crossingsN: row.crossingsN || [],
+                crossingsC: row.crossingsC || []
+            }));
+
+            resultsTable = new Tabulator("#resultsTable", {
+                data: tableData,
+                layout: "fitDataStretch",
+                pagination: "local",
+                paginationSize: 25,
+                paginationSizeSelector: [10, 25, 50, 100],
+                movableColumns: true,
+                resizableRows: true,
+                selectable: 1,
+                columns: [
+                    {title: "#", field: "id", width: 60, frozen: true},
+                    {title: "Chain", field: "chain", width: 80},
+                    {title: "i", field: "i", width: 80},
+                    {title: "j", field: "j", width: 80},
+                    {title: "G", field: "g", width: 100},
+                    {title: "GN", field: "GN", width: 80},
+                    {title: "ΔGN", field: "delta_GN", width: 80},
+                    {
+                        title: "Crossings N",
+                        field: "crossingsN",
+                        width: 200,
+                        formatter: (cell) => {
+                            const value = cell.getValue();
+                            return Array.isArray(value) ? value.join(", ") : "";
+                        }
+                    },
+                    {
+                        title: "Crossings C",
+                        field: "crossingsC",
+                        width: 200,
+                        formatter: (cell) => {
+                            const value = cell.getValue();
+                            return Array.isArray(value) ? value.join(", ") : "";
+                        }
+                    }
+                ]
+            });
+
+            // Handle row selection
+            resultsTable.on("rowClick", function(e, row) {
+                const rowData = row.getData();
+                highlightEntanglement(rowData);
+            });
+        }
+
+        // Load structure into NGL viewer
+        function loadStructureIntoNGL(pdbContent) {
+            const viewport = document.getElementById('nglViewport');
+            viewport.innerHTML = ''; // Clear existing content
+            
+            nglStage = new NGL.Stage(viewport, {
+                backgroundColor: "white"
+            });
+
+            const blob = new Blob([pdbContent], { type: 'text/plain' });
+            nglStage.loadFile(blob, { ext: "pdb" }).then(function (component) {
+                component.addRepresentation("cartoon", {
+                    colorScheme: "chainname"
+                });
+                component.autoView();
+                
+                // Populate chain selector
+                populateChainSelector(component.structure);
+            });
+
+            window.addEventListener('resize', () => {
+                if (nglStage) nglStage.handleResize();
+            });
+        }
+
+        // Populate chain selector
+        function populateChainSelector(structure) {
+            const chainSelect = document.getElementById('chainSelect');
+            chainSelect.innerHTML = '<option value="all">All Chains</option>';
+            
+            const chains = [];
+            structure.eachChain(chain => {
+                chains.push(chain.chainname);
+            });
+            
+            const uniqueChains = [...new Set(chains)];
+            uniqueChains.forEach(chain => {
+                const option = document.createElement('option');
+                option.value = chain;
+                option.textContent = `Chain ${chain}`;
+                chainSelect.appendChild(option);
+            });
+            
+            chainSelect.addEventListener('change', (e) => {
+                currentChain = e.target.value;
+                updateChainDisplay();
+            });
+        }
+
+        // Update chain display
+        function updateChainDisplay() {
+            if (!nglStage || nglStage.compList.length === 0) return;
+            
+            const component = nglStage.compList[0];
+            component.removeAllRepresentations();
+            
+            if (currentChain === 'all') {
+                component.addRepresentation("cartoon", {
+                    colorScheme: "chainname"
+                });
+            } else {
+                component.addRepresentation("cartoon", {
+                    sele: `:${currentChain}`,
+                    colorScheme: "chainname"
+                });
+            }
+        }
+
+        // Highlight entanglement
+        function highlightEntanglement(rowData) {
+            if (!nglStage || nglStage.compList.length === 0) return;
+            
+            const component = nglStage.compList[0];
+            
+            // Remove previous highlights
+            component.removeAllRepresentations();
+            
+            // Base cartoon
+            component.addRepresentation("cartoon", {
+                colorScheme: "chainname",
+                opacity: 0.3
+            });
+            
+            // Highlight loop (i to j) in the specified chain
+            component.addRepresentation("cartoon", {
+                sele: `${rowData.i}-${rowData.j}:${rowData.chain}`,
+                color: "green"
+            });
+            
+            // Highlight i and j residues with red VDW spheres
+            component.addRepresentation("spacefill", {
+                sele: `${rowData.i}:${rowData.chain} or ${rowData.j}:${rowData.chain}`,
+                color: "red",
+                scale: 1.0
+            });
+            
+            // Highlight crossing residues with blue VDW spheres
+            const crossings = [...rowData.crossingsN, ...rowData.crossingsC];
+            if (crossings.length > 0) {
+                const crossingSele = crossings.map(c => `${c}:${rowData.chain}`).join(' or ');
+                component.addRepresentation("spacefill", {
+                    sele: crossingSele,
+                    color: "blue",
+                    scale: 1.0
+                });
+            }
+            
+            // Center view on the loop
+            component.autoView(`${rowData.i}-${rowData.j}:${rowData.chain}`, 500);
+        }
+
+        // Reset view
+        document.getElementById('resetView')?.addEventListener('click', () => {
+            if (nglStage && nglStage.compList.length > 0) {
+                nglStage.compList[0].autoView();
+            }
+        });
+
+        // Clear selection
+        document.getElementById('clearSelection')?.addEventListener('click', () => {
+            if (resultsTable) {
+                resultsTable.deselectRow();
+            }
+            updateChainDisplay();
+        });
+
+        // Toggle spin
+        document.getElementById('toggleSpin')?.addEventListener('click', () => {
+            if (!nglStage) return;
+            isSpinning = !isSpinning;
+            nglStage.setSpin(isSpinning);
+        });
+
+        // Download CSV
+        function downloadCSV(data, pdbId) {
+            const headers = ['Chain', 'i', 'j', 'G', 'GN', 'ΔGN', 'Crossings_N', 'Crossings_C'];
+            const rows = data.map(row => [
+                row.chain,
+                row.i,
+                row.j,
+                row.g,
+                row.GN,
+                row.delta_GN,
+                (row.crossingsN || []).join('; '),
+                (row.crossingsC || []).join('; ')
+            ]);
+            
+            let csvContent = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csvContent += row.join(',') + '\n';
+            });
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${pdbId || 'results'}_entanglement.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', loadJobData);
+    </script>
+</body>
+</html>

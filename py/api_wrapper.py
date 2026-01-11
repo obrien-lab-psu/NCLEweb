@@ -47,7 +47,7 @@ def get_chains(pdb_path):
         return ['']  # Return single empty chain on error
 
 
-def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli"):
+def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False):
     """
     Calculate native Gaussian entanglement for a PDB file.
     Runs Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE analyses.
@@ -62,6 +62,10 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         Structure type: "EXP" for experimental or "AF" for AlphaFold, by default "EXP"
     organism : str, optional
         Organism for clustering: "Ecoli", "Human", or "Yeast", by default "Ecoli"
+    coarse_grained : bool, optional
+        Whether the structure is coarse-grained (C-alpha only) - sets CG parameter, by default False
+    ca_contact : bool, optional
+        Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter, by default False
         
     Returns
     -------
@@ -77,7 +81,6 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         - 'error': str with error message (if success=False)
         - 'pdb_id': str identifier from filename
     """
-    
     result = {
         'success': False,
         'data': None,
@@ -135,13 +138,15 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
             hq_temp_dir = os.path.join(chain_temp_dir, 'HQ')
             os.makedirs(hq_temp_dir, exist_ok=True)
             
-            # Initialize GaussianEntanglement with default parameters
-            # g_threshold=0.6, density=0.0, Calpha=False (use heavy atoms)
+            # Initialize GaussianEntanglement with parameters
+            # g_threshold=0.6, density=0.0
+            # CG=coarse_grained (True for C-alpha only models, False for all-atom)
+            # Calpha=ca_contact (True for C-alpha contacts, False for heavy atom contacts)
             ge = GaussianEntanglement(
                 g_threshold=0.6, 
                 density=0.0, 
-                Calpha=False, 
-                CG=False
+                Calpha=ca_contact, 
+                CG=coarse_grained
             )
             
             # Calculate native entanglements (Step 1: Native_GE)

@@ -23,22 +23,26 @@ if __name__ == "__main__":
     start_time = time.time()
 
     parser = argparse.ArgumentParser(description="Process user specified arguments")
-    parser.add_argument("--struct", type=str, required=True, help="Path to either .pdb or .cor file for structure")
+    parser.add_argument("--struct", type=str, required=True, help="Path to PDB structure file")
     parser.add_argument("--outdir", type=str, required=True, help="output directory for results")
     parser.add_argument("--ID", type=str, required=False, help="An id for the analysis (defaults to structure basename)")
     parser.add_argument("--chain", type=str, required=False, help="Chain identifier (optional, processes all chains if not specified)", default=None)
     parser.add_argument("--organism", type=str, required=False, help="Organism name for clustering: {Ecoli, Human, Yeast}", default='Ecoli')
     parser.add_argument("--Accession", type=str, required=False, help="UniProt Accession for the protein", default='P00558')
+    parser.add_argument("--cg", action='store_true', help="Indicate structure is coarse-grained (C-alpha only) model")
+    parser.add_argument("--CaContact", action='store_true', help="Indicate whether to use C-alpha contacts for feature generation (if not set, uses heavy atom contacts)")
     args = parser.parse_args()
     print(args)
+    
     struct = args.struct
     outdir = args.outdir
     ID = args.ID if args.ID is not None else os.path.splitext(os.path.basename(struct))[0]
     chain = args.chain
     organism = args.organism
-
+    cg = args.cg
+    CaContact = args.CaContact
     # Set up Gaussian Entanglement and Clustering objects
-    ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=False, CG=False)
+    ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=CaContact, CG=cg)
     clustering = ClusterNativeEntanglements(organism=organism)
 
     # Determine which chains to process
@@ -83,7 +87,7 @@ if __name__ == "__main__":
         nativeClusteredEnt = clustering.Cluster_NativeEntanglements(HQNativeEnt['outfile'], outdir=os.path.join(outdir, "Native_clustered_HQ_GE"), outfile=f"{hq_id}.csv", chain=chain_id)
         print(f'Clustered native entanglements saved to {nativeClusteredEnt["outfile"]}')
 
-        # Generate entanglement features for clustered native entanglements
+        # # Generate entanglement features for clustered native entanglements
         # FGen = FeatureGen(struct, outdir=os.path.join(outdir, "Native_clustered_HQ_GE_features"), cluster_file=nativeClusteredEnt['outfile'])
         # EntFeatures = FGen.get_uent_features(gene=args.Accession, chain=chain_id, pdbid=ID)
         # print(f'Entanglement features saved to {EntFeatures["outfile"]}')

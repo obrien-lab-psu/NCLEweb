@@ -281,6 +281,66 @@
             </div>
             
             <div class="form-group">
+                <label>
+                    Model Resolution <span class="required">*</span>
+                </label>
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="modelResolutionAA" 
+                            name="modelResolution" 
+                            value="all-atom" 
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span>All-Atom</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="modelResolutionCG" 
+                            name="modelResolution" 
+                            value="ca-cg"
+                            style="margin-right: 8px;"
+                        >
+                        <span>C-alpha Coarse-Grained</span>
+                    </label>
+                </div>
+                <small>For C-alpha CG models, PDB must have atom names "A" and residue names "G1", "G2", etc.</small>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    Contact Type <span class="required">*</span>
+                </label>
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="contactTypeHeavy" 
+                            name="contactType" 
+                            value="heavy-atom" 
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span>Heavy Atom Contacts</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="contactTypeCa" 
+                            name="contactType" 
+                            value="ca-contact"
+                            style="margin-right: 8px;"
+                        >
+                        <span>C-alpha Contacts</span>
+                    </label>
+                </div>
+                <small>Select the type of contacts to use for analysis</small>
+            </div>
+            
+            <div class="form-group">
                 <label for="pdbFile">
                     PDB File <span class="required">*</span>
                 </label>
@@ -319,12 +379,92 @@
             statusMessage.style.display = 'block';
         }
         
+        async function validateCoarseGrainedPDB(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    const lines = content.split('\n');
+                    
+                    // Check for coarse-grained format requirements:
+                    // 1. All ATOM records should have atom name "A"
+                    // 2. Residue names should follow pattern "G1", "G2", etc.
+                    
+                    const atomLines = lines.filter(line => line.startsWith('ATOM'));
+                    
+                    if (atomLines.length === 0) {
+                        reject('No ATOM records found in PDB file');
+                        return;
+                    }
+                    
+                    let validFormat = true;
+                    let errorMsg = '';
+                    
+                    for (let i = 0; i < Math.min(atomLines.length, 50); i++) {
+                        const line = atomLines[i];
+                        // Atom name is at columns 13-16 (0-indexed: 12-15)
+                        const atomName = line.substring(12, 16).trim();
+                        // Residue name is at columns 18-20 (0-indexed: 17-20)
+                        const resName = line.substring(17, 20).trim();
+                        
+                        if (atomName !== 'A') {
+                            validFormat = false;
+                            errorMsg = `Invalid coarse-grained format: Atom name should be "A" but found "${atomName}"`;
+                            break;
+                        }
+                        
+                        if (!resName.match(/^G\d+$/)) {
+                            validFormat = false;
+                            errorMsg = `Invalid coarse-grained format: Residue name should be "G#" (e.g., G1, G2) but found "${resName}"`;
+                            break;
+                        }
+                    }
+                    
+                    if (validFormat) {
+                        resolve(true);
+                    } else {
+                        reject(errorMsg);
+                    }
+                };
+                reader.onerror = () => reject('Error reading PDB file');
+                reader.readAsText(file);
+            });
+        }
+        
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             // Disable submit button
             submitBtn.disabled = true;
             submitBtn.textContent = 'Submitting...';
+            
+            // Get model resolution and contact type
+            const modelResolution = document.querySelector('input[name="modelResolution"]:checked').value;
+            const contactType = document.querySelector('input[name="contactType"]:checked').value;
+            const isCaCG = (modelResolution === 'ca-cg');
+            const useCaContact = (contactType === 'ca-contact');
+            const pdbFile = document.getElementById('pdbFile').files[0];
+            
+            // Validate combination: CG model cannot use heavy atom contacts
+            if (isCaCG && !useCaContact) {
+                showStatus('Invalid combination: C-alpha Coarse-Grained models must use C-alpha Contacts (not Heavy Atom Contacts)', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Analysis';
+                return;
+            }
+            
+            // Validate coarse-grained format if C-alpha CG model is selected
+            if (isCaCG) {
+                try {
+                    showStatus('Validating C-alpha coarse-grained PDB format...', 'info');
+                    await validateCoarseGrainedPDB(pdbFile);
+                } catch (error) {
+                    showStatus(`Validation Error: ${error}. Please ensure your PDB file follows the required format (atom name "A", residue names "G1", "G2", etc.)`, 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Analysis';
+                    return;
+                }
+            }
             
             // Get form data
             const formData = new FormData();
@@ -336,7 +476,9 @@
             formData.append('structure_type', structureType);
             const organism = document.querySelector('input[name="organism"]:checked').value;
             formData.append('organism', organism);
-            formData.append('file', document.getElementById('pdbFile').files[0]);
+            formData.append('coarse_grained', isCaCG);
+            formData.append('ca_contact', useCaContact);
+            formData.append('file', pdbFile);
             
             try {
                 showStatus('Uploading and submitting job...', 'info');

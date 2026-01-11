@@ -274,6 +274,7 @@
         const API_BASE_URL = 'http://localhost:8000';
         let jobId = null;
         let jobData = null;
+        let currentJobData = null;  // Store full job data including flags
         let resultsTable = null;
         let hqResultsTable = null;
         let clusteredResultsTable = null;
@@ -387,6 +388,9 @@
 
         // Display results
         function displayResults(data) {
+            // Store current job data for use in viewer
+            currentJobData = data;
+            
             document.getElementById('resultsSection').style.display = 'block';
             
             // Update title
@@ -704,9 +708,28 @@
 
             const blob = new Blob([pdbContent], { type: 'text/plain' });
             nglStage.loadFile(blob, { ext: "pdb" }).then(function (component) {
-                component.addRepresentation("cartoon", {
-                    colorScheme: "chainname"
-                });
+                // Check if structure is coarse-grained by looking for model resolution flag
+                const isCoarseGrained = currentJobData && currentJobData.coarse_grained;
+                
+                if (isCoarseGrained) {
+                    // Use spacefill + line representation for coarse-grained structures
+                    component.addRepresentation("spacefill", {
+                        colorScheme: "chainname",
+                        radius: 1.0
+                    });
+                    component.addRepresentation("distance", {
+                        colorScheme: "chainname",
+                        labelVisible: false,
+                        useCylinder: true,
+                        radiusScale: 0.3,
+                        maxDistance: 5.0  // Only show bonds between nearby beads
+                    });
+                } else {
+                    // Use cartoon representation for all-atom structures
+                    component.addRepresentation("cartoon", {
+                        colorScheme: "chainname"
+                    });
+                }
                 component.autoView();
                 
                 // Populate chain selector
@@ -750,17 +773,48 @@
             if (!nglStage || nglStage.compList.length === 0) return;
             
             const component = nglStage.compList[0];
+            const isCoarseGrained = currentJobData && currentJobData.coarse_grained;
             component.removeAllRepresentations();
             
             if (currentChain === 'all') {
-                component.addRepresentation("cartoon", {
-                    colorScheme: "chainname"
-                });
+                if (isCoarseGrained) {
+                    component.addRepresentation("spacefill", {
+                        colorScheme: "chainname",
+                        radius: 1.0
+                    });
+                    component.addRepresentation("distance", {
+                        colorScheme: "chainname",
+                        labelVisible: false,
+                        useCylinder: true,
+                        radiusScale: 0.3,
+                        maxDistance: 5.0
+                    });
+                } else {
+                    component.addRepresentation("cartoon", {
+                        colorScheme: "chainname"
+                    });
+                }
             } else {
-                component.addRepresentation("cartoon", {
-                    sele: `:${currentChain}`,
-                    colorScheme: "chainname"
-                });
+                if (isCoarseGrained) {
+                    component.addRepresentation("spacefill", {
+                        sele: `:${currentChain}`,
+                        colorScheme: "chainname",
+                        radius: 1.0
+                    });
+                    component.addRepresentation("distance", {
+                        sele: `:${currentChain}`,
+                        colorScheme: "chainname",
+                        labelVisible: false,
+                        useCylinder: true,
+                        radiusScale: 0.3,
+                        maxDistance: 5.0
+                    });
+                } else {
+                    component.addRepresentation("cartoon", {
+                        sele: `:${currentChain}`,
+                        colorScheme: "chainname"
+                    });
+                }
             }
         }
 
@@ -771,24 +825,63 @@
             console.log('highlightEntanglement called with:', rowData);
             
             const component = nglStage.compList[0];
+            const isCoarseGrained = currentJobData && currentJobData.coarse_grained;
             
             // Remove previous highlights
             component.removeAllRepresentations();
             
-            // 1. Base cartoon - show based on chain selection in grey
+            // Determine representation type based on model
+            const baseRepType = isCoarseGrained ? "ball+stick" : "cartoon";
+            const highlightRepType = isCoarseGrained ? "ball+stick" : "cartoon";
+            
+            // 1. Base representation - show based on chain selection in grey
             if (currentChain === 'all') {
                 // Show all chains in grey
-                component.addRepresentation("cartoon", {
-                    color: "grey",
-                    opacity: 0.3
-                });
+                if (isCoarseGrained) {
+                    component.addRepresentation("spacefill", {
+                        color: "grey",
+                        opacity: 0.3,
+                        radius: 0.8
+                    });
+                    component.addRepresentation("distance", {
+                        color: "grey",
+                        opacity: 0.3,
+                        labelVisible: false,
+                        useCylinder: true,
+                        radiusScale: 0.2,
+                        maxDistance: 5.0
+                    });
+                } else {
+                    component.addRepresentation("cartoon", {
+                        color: "grey",
+                        opacity: 0.3
+                    });
+                }
             } else {
                 // Show only selected chain in grey
-                component.addRepresentation("cartoon", {
-                    sele: `:${currentChain}`,
-                    color: "grey",
-                    opacity: 0.3
-                });
+                if (isCoarseGrained) {
+                    component.addRepresentation("spacefill", {
+                        sele: `:${currentChain}`,
+                        color: "grey",
+                        opacity: 0.3,
+                        radius: 0.8
+                    });
+                    component.addRepresentation("distance", {
+                        sele: `:${currentChain}`,
+                        color: "grey",
+                        opacity: 0.3,
+                        labelVisible: false,
+                        useCylinder: true,
+                        radiusScale: 0.2,
+                        maxDistance: 5.0
+                    });
+                } else {
+                    component.addRepresentation("cartoon", {
+                        sele: `:${currentChain}`,
+                        color: "grey",
+                        opacity: 0.3
+                    });
+                }
             }
             
             // Parse crossings - handle null, undefined, empty string, and '?' values
@@ -814,17 +907,35 @@
                 allCrossings
             });
             
-            // 2. Highlight loop (i to j) in BRIGHT RED cartoon
+            // 2. Highlight loop (i to j) in BRIGHT RED
             const chainSele = `:${rowData.chain}`;
-            component.addRepresentation("cartoon", {
-                sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
-                color: "#FF0000",  // Bright red
-                aspectRatio: 5,
-                scale: 1.8,
-                opacity: 1.0
-            });
+            if (isCoarseGrained) {
+                component.addRepresentation("spacefill", {
+                    sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
+                    color: "#FF0000",  // Bright red
+                    radius: 1.2,
+                    opacity: 1.0
+                });
+                component.addRepresentation("distance", {
+                    sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
+                    color: "#FF0000",
+                    labelVisible: false,
+                    useCylinder: true,
+                    radiusScale: 0.4,
+                    maxDistance: 5.0,
+                    opacity: 1.0
+                });
+            } else {
+                component.addRepresentation("cartoon", {
+                    sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
+                    color: "#FF0000",  // Bright red
+                    aspectRatio: 5,
+                    scale: 1.8,
+                    opacity: 1.0
+                });
+            }
             
-            // 3. Highlight crossing residues +/- 3 in BRIGHT BLUE cartoon
+            // 3. Highlight crossing residues +/- 3 in BRIGHT BLUE
             if (allCrossings.length > 0) {
                 const crossingSelections = [];
                 allCrossings.forEach(res => {
@@ -833,13 +944,31 @@
                     crossingSelections.push(`${start}-${end}`);
                 });
                 const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
-                component.addRepresentation('cartoon', {
-                    sele: crossingSele,
-                    color: '#0000FF',  // Bright blue
-                    aspectRatio: 5,
-                    scale: 1.8,
-                    opacity: 1.0
-                });
+                if (isCoarseGrained) {
+                    component.addRepresentation('spacefill', {
+                        sele: crossingSele,
+                        color: '#0000FF',  // Bright blue
+                        radius: 1.2,
+                        opacity: 1.0
+                    });
+                    component.addRepresentation('distance', {
+                        sele: crossingSele,
+                        color: '#0000FF',
+                        labelVisible: false,
+                        useCylinder: true,
+                        radiusScale: 0.4,
+                        maxDistance: 5.0,
+                        opacity: 1.0
+                    });
+                } else {
+                    component.addRepresentation('cartoon', {
+                        sele: crossingSele,
+                        color: '#0000FF',  // Bright blue
+                        aspectRatio: 5,
+                        scale: 1.8,
+                        opacity: 1.0
+                    });
+                }
             }
             
             // 4. Add VDW (spacefill) for i and j in BRIGHT RED

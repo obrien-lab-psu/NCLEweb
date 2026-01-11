@@ -33,6 +33,8 @@ class Job(Base):
     error_message = Column(Text, nullable=True)
     num_entanglements = Column(Integer, nullable=True)
     num_chains = Column(Integer, nullable=True)
+    coarse_grained = Column(Boolean, nullable=False, default=False)
+    ca_contact = Column(Boolean, nullable=False, default=False)
     
     # Relationship to results
     results = relationship("Result", back_populates="job", cascade="all, delete-orphan")
@@ -54,7 +56,9 @@ class Job(Base):
             'status': self.status,
             'error_message': self.error_message,
             'num_entanglements': self.num_entanglements,
-            'num_chains': self.num_chains
+            'num_chains': self.num_chains,
+            'coarse_grained': self.coarse_grained,
+            'ca_contact': self.ca_contact
         }
         if include_email:
             data['email'] = self.email
@@ -225,7 +229,7 @@ class Database:
         """Get a new database session"""
         return self.Session()
     
-    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None):
+    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False):
         """Create a new job entry"""
         session = self.get_session()
         try:
@@ -236,7 +240,9 @@ class Database:
                 pdb_filename=pdb_filename,
                 uniprot_id=uniprot_id,
                 description=description,
-                status='pending'
+                status='pending',
+                coarse_grained=coarse_grained,
+                ca_contact=ca_contact
             )
             session.add(job)
             session.commit()

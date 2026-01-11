@@ -247,7 +247,7 @@ def validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
-async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli"):
+async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False):
     """Background task to process job
     
     Parameters
@@ -262,13 +262,17 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
         Structure type: "EXP" for experimental or "AF" for AlphaFold
     organism : str
         Organism for clustering: "Ecoli", "Human", or "Yeast"
+    coarse_grained : bool
+        Whether the structure is coarse-grained (C-alpha only) - sets CG parameter
+    ca_contact : bool
+        Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter
     """
     try:
         # Update status to processing
         db.update_job_status(job_id, 'processing')
         
         # Run analysis (don't cleanup yet - we need to save the PDB file)
-        result = calculate_native_ge(temp_pdb_path, cleanup=False, structure_type=structure_type, organism=organism)
+        result = calculate_native_ge(temp_pdb_path, cleanup=False, structure_type=structure_type, organism=organism, coarse_grained=coarse_grained, ca_contact=ca_contact)
         
         if not result['success']:
             # Job failed - cleanup temp file
@@ -343,6 +347,8 @@ async def submit_job(
     description: Optional[str] = Form(None),
     structure_type: str = Form("EXP"),
     organism: str = Form("Ecoli"),
+    coarse_grained: bool = Form(False),
+    ca_contact: bool = Form(False),
     file: UploadFile = File(...)
 ):
     """
@@ -362,6 +368,10 @@ async def submit_job(
         Structure type: "EXP" or "AF"
     organism : str
         Organism for clustering: "Ecoli", "Human", or "Yeast"
+    coarse_grained : bool
+        Whether the structure is coarse-grained (C-alpha only) - sets CG parameter
+    ca_contact : bool
+        Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter
     file : UploadFile
         PDB file to analyze
         
@@ -396,7 +406,9 @@ async def submit_job(
         job_name=job_name.strip(),
         pdb_filename=file.filename,
         uniprot_id=uniprot_id.strip() if uniprot_id else None,
-        description=description.strip() if description else None
+        description=description.strip() if description else None,
+        coarse_grained=coarse_grained,
+        ca_contact=ca_contact
     )
     
     # Save PDB file temporarily
@@ -408,7 +420,7 @@ async def submit_job(
     base_url = os.getenv('BASE_URL', 'http://localhost:8000')
     
     # Add background task to process the job
-    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url, structure_type, organism)
+    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact)
     
     return JSONResponse(content={
         'success': True,

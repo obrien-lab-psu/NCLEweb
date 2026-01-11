@@ -25,6 +25,35 @@ from api_wrapper import calculate_native_ge
 from database import db, Job, Result
 from email_notifier import email_notifier
 
+
+def split_combined_crossings(hq_results: list) -> list:
+    """
+    Split combined 'c' column back into crossingsN and crossingsC for frontend.
+    HQResult table stores combined crossings in 'c' column as 'crossingsN;crossingsC'.
+    This function splits it back for consistent frontend handling.
+    """
+    if not hq_results:
+        return hq_results
+    
+    processed_results = []
+    for result in hq_results:
+        result_copy = result.copy()
+        c_value = result_copy.get('c', '')
+        
+        if c_value and ';' in c_value:
+            parts = c_value.split(';', 1)
+            result_copy['crossingsN'] = parts[0]
+            result_copy['crossingsC'] = parts[1] if len(parts) > 1 else ''
+        else:
+            result_copy['crossingsN'] = c_value if c_value else ''
+            result_copy['crossingsC'] = ''
+        
+        # Keep 'c' for backward compatibility
+        processed_results.append(result_copy)
+    
+    return processed_results
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title="NCLE Gaussian Entanglement API",
@@ -218,14 +247,28 @@ def validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
-async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str):
-    """Background task to process job"""
+async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli"):
+    """Background task to process job
+    
+    Parameters
+    ----------
+    job_id : str
+        Unique job identifier
+    temp_pdb_path : str
+        Path to temporary PDB file
+    base_url : str
+        Base URL for email links
+    structure_type : str
+        Structure type: "EXP" for experimental or "AF" for AlphaFold
+    organism : str
+        Organism for clustering: "Ecoli", "Human", or "Yeast"
+    """
     try:
         # Update status to processing
         db.update_job_status(job_id, 'processing')
         
         # Run analysis (don't cleanup yet - we need to save the PDB file)
-        result = calculate_native_ge(temp_pdb_path, cleanup=False)
+        result = calculate_native_ge(temp_pdb_path, cleanup=False, structure_type=structure_type, organism=organism)
         
         if not result['success']:
             # Job failed - cleanup temp file
@@ -257,8 +300,14 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str):
         # Cleanup temp file
         os.remove(temp_pdb_path)
         
-        # Save results to database
-        db.save_results(job_id, result['data'], pdb_id=result['pdb_id'])
+        # Save results to database (Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE)
+        db.save_results(
+            job_id, 
+            result['data'], 
+            pdb_id=result['pdb_id'],
+            hq_results_df=result.get('hq_data'),
+            clustered_results_df=result.get('clustered_data')
+        )
         db.update_job_status(job_id, 'completed')
         
         # Send completion email
@@ -292,6 +341,8 @@ async def submit_job(
     job_name: str = Form(...),
     uniprot_id: Optional[str] = Form(None),
     description: Optional[str] = Form(None),
+    structure_type: str = Form("EXP"),
+    organism: str = Form("Ecoli"),
     file: UploadFile = File(...)
 ):
     """
@@ -307,6 +358,10 @@ async def submit_job(
         Uniprot ID if available
     description : str, optional
         Job description
+    structure_type : str
+        Structure type: "EXP" or "AF"
+    organism : str
+        Organism for clustering: "Ecoli", "Human", or "Yeast"
     file : UploadFile
         PDB file to analyze
         
@@ -353,7 +408,7 @@ async def submit_job(
     base_url = os.getenv('BASE_URL', 'http://localhost:8000')
     
     # Add background task to process the job
-    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url)
+    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url, structure_type, organism)
     
     return JSONResponse(content={
         'success': True,
@@ -425,6 +480,12 @@ async def get_job_details(job_id: str):
             except Exception as e:
                 print(f"Error reading PDB file: {e}")
         
+        # Get clustered results (harmonized format with crossingsN/crossingsC)
+        clustered_results = job_data.get('clustered_results', [])
+        
+        # Split HQ results 'c' column back to crossingsN and crossingsC
+        hq_results = split_combined_crossings(job_data.get('hq_results', []))
+        
         return JSONResponse(content={
             'success': True,
             'pdb_id': job_data['job']['pdb_id'],
@@ -437,6 +498,8 @@ async def get_job_details(job_id: str):
             'num_entanglements': job_data['job']['num_entanglements'],
             'num_chains': job_data['job']['num_chains'],
             'results': job_data['results'],
+            'hq_results': hq_results,
+            'clustered_results': clustered_results,
             'error_message': job_data['job'].get('error_message'),
             'pdb_content': pdb_content
         })

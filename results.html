@@ -211,15 +211,58 @@
                         </div>
                     </div>
                     
+                    <!-- Table Toggle Controls -->
+                    <div class="table-toggle-section" style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                        <h3 style="margin: 0 0 12px 0; font-size: 1.1rem;">Show/Hide Results Tables</h3>
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="toggleNativeGE" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Native_GE Results (ENT=True only)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="toggleHQResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Native_HQ_GE Results (Slipknots Removed)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="toggleClusteredResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Native_clustered_HQ_GE (Clustered)</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- Results Table -->
-                    <div class="table-section">
-                        <h3>Entanglement Data</h3>
+                    <div class="table-section" id="nativeGESection">
+                        <h3>Native_GE Results (ENT=True only)</h3>
                         <div id="resultsTable" class="table-container">
                             <!-- Tabulator table will be rendered here -->
                         </div>
                         
                         <div id="noResults" class="no-results" style="display: none;">
                             <p>No entanglements detected in this structure.</p>
+                        </div>
+                    </div>
+
+                    <!-- High-Quality Results Table -->
+                    <div class="table-section" id="hqResultsSection" style="display: none;">
+                        <h3>Native_HQ_GE Results (Slipknots Removed)</h3>
+                        <div id="hqResultsTable" class="table-container">
+                            <!-- Tabulator table for HQ results will be rendered here -->
+                        </div>
+                        
+                        <div id="noHQResults" class="no-results" style="display: none;">
+                            <p>No high-quality entanglements remaining after filtering.</p>
+                        </div>
+                    </div>
+
+                    <!-- Clustered Results Table -->
+                    <div class="table-section" id="clusteredResultsSection" style="display: none;">
+                        <h3>Native_clustered_HQ_GE (Clustered Entanglements)</h3>
+                        <div id="clusteredResultsTable" class="table-container">
+                            <!-- Tabulator table for clustered results will be rendered here -->
+                        </div>
+                        
+                        <div id="noClusteredResults" class="no-results" style="display: none;">
+                            <p>No clustered entanglements found.</p>
                         </div>
                     </div>
                 </div>
@@ -232,10 +275,40 @@
         let jobId = null;
         let jobData = null;
         let resultsTable = null;
+        let hqResultsTable = null;
+        let clusteredResultsTable = null;
         let nglStage = null;
         let pdbFileContent = null;
         let currentChain = 'all';
         let isSpinning = false;
+
+        // Setup table toggle listeners
+        function setupTableToggles() {
+            const toggleNativeGE = document.getElementById('toggleNativeGE');
+            const toggleHQResults = document.getElementById('toggleHQResults');
+            const toggleClusteredResults = document.getElementById('toggleClusteredResults');
+            const nativeGESection = document.getElementById('nativeGESection');
+            const hqResultsSection = document.getElementById('hqResultsSection');
+            const clusteredResultsSection = document.getElementById('clusteredResultsSection');
+
+            if (toggleNativeGE) {
+                toggleNativeGE.addEventListener('change', function() {
+                    nativeGESection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            if (toggleHQResults) {
+                toggleHQResults.addEventListener('change', function() {
+                    hqResultsSection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            if (toggleClusteredResults) {
+                toggleClusteredResults.addEventListener('change', function() {
+                    clusteredResultsSection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+        }
 
         // Get job_id from URL parameter
         function getJobIdFromURL() {
@@ -322,13 +395,29 @@
             
             // Display stats
             const results = data.results || [];
-            const numEntanglements = results.length;
-            const chains = [...new Set(results.map(r => r.chain))];
+            const hqResults = data.hq_results || [];
+            const clusteredResults = data.clustered_results || [];
+            
+            // Filter Native_GE results to only show ENT = True
+            const entResults = results.filter(r => r.ENT === true || r.ENT === 1);
+            
+            const numEntanglements = entResults.length;
+            const numHQEntanglements = hqResults.length;
+            const numClusteredEntanglements = clusteredResults.length;
+            const chains = [...new Set(entResults.map(r => r.chain))];
             
             const statsHTML = `
                 <div class="stat-card">
                     <div class="stat-value">${numEntanglements}</div>
                     <div class="stat-label">Total Entanglements</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${numHQEntanglements}</div>
+                    <div class="stat-label">High-Quality</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${numClusteredEntanglements}</div>
+                    <div class="stat-label">Clustered</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">${chains.length}</div>
@@ -344,8 +433,14 @@
             } else {
                 document.getElementById('noResults').style.display = 'none';
                 document.getElementById('resultsTable').style.display = 'block';
-                renderTable(results);
+                renderTable(entResults);
             }
+            
+            // Render HQ table if available
+            renderHQTable(hqResults);
+            
+            // Render clustered table if available
+            renderClusteredTable(clusteredResults);
             
             // Load structure into NGL viewer if PDB content is available
             if (data.pdb_content) {
@@ -439,6 +534,165 @@
             });
         }
 
+        function renderHQTable(data) {
+            const hqResultsSection = document.getElementById('hqResultsSection');
+            const toggleHQResults = document.getElementById('toggleHQResults');
+            
+            if (!data || data.length === 0) {
+                hqResultsSection.style.display = 'none';
+                if (toggleHQResults) {
+                    toggleHQResults.checked = false;
+                    toggleHQResults.disabled = true;
+                    toggleHQResults.parentElement.style.opacity = '0.5';
+                }
+                return;
+            }
+
+            // Enable the toggle and respect its state
+            if (toggleHQResults) {
+                toggleHQResults.disabled = false;
+                toggleHQResults.parentElement.style.opacity = '1';
+                hqResultsSection.style.display = toggleHQResults.checked ? 'block' : 'none';
+            } else {
+                hqResultsSection.style.display = 'block';
+            }
+            
+            const columns = [
+                { title: "ID", field: "ID", minWidth: 100, widthGrow: 1 },
+                { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+                { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+                { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "Gn", field: "Gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "Gc", field: "Gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
+                { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+            ];
+
+            hqResultsTable = new Tabulator("#hqResultsTable", {
+                data: data,
+                columns: columns,
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
+                movableColumns: true,
+                resizableColumns: true,
+                resizableRows: true,
+                height: "600px",
+                tooltips: true,
+                selectable: 1,
+                selectableRollingSelection: false
+            });
+
+            // Handle row selection for HQ table
+            hqResultsTable.on("rowClick", function(e, row) {
+                const rowData = row.getData();
+                
+                // Update chain selector to match the selected row's chain
+                const chainSelect = document.getElementById('chainSelect');
+                if (chainSelect && currentChain === 'all') {
+                    chainSelect.value = rowData.chain;
+                    currentChain = rowData.chain;
+                }
+                
+                // Harmonized format - use crossingsN and crossingsC directly
+                const convertedRowData = {
+                    chain: rowData.chain,
+                    i: rowData.i,
+                    j: rowData.j,
+                    crossingsN: rowData.crossingsN || '',
+                    crossingsC: rowData.crossingsC || ''
+                };
+                
+                highlightEntanglement(convertedRowData);
+            });
+        }
+
+        function renderClusteredTable(data) {
+            const clusteredResultsSection = document.getElementById('clusteredResultsSection');
+            const toggleClusteredResults = document.getElementById('toggleClusteredResults');
+            
+            if (!data || data.length === 0) {
+                clusteredResultsSection.style.display = 'none';
+                if (toggleClusteredResults) {
+                    toggleClusteredResults.checked = false;
+                    toggleClusteredResults.disabled = true;
+                    toggleClusteredResults.parentElement.style.opacity = '0.5';
+                }
+                return;
+            }
+
+            // Enable the toggle and respect its state
+            if (toggleClusteredResults) {
+                toggleClusteredResults.disabled = false;
+                toggleClusteredResults.parentElement.style.opacity = '1';
+                clusteredResultsSection.style.display = toggleClusteredResults.checked ? 'block' : 'none';
+            } else {
+                clusteredResultsSection.style.display = 'block';
+            }
+            
+            const columns = [
+                { title: "ID", field: "ID", minWidth: 100, widthGrow: 1 },
+                { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+                { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+                { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+                { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+                { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+                { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
+                { title: "Num Contacts", field: "num_contacts", minWidth: 120, widthGrow: 1 },
+                { title: "Contacts", field: "contacts", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "CCBond", field: "CCBond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+            ];
+
+            clusteredResultsTable = new Tabulator("#clusteredResultsTable", {
+                data: data,
+                columns: columns,
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
+                movableColumns: true,
+                resizableColumns: true,
+                resizableRows: true,
+                height: "600px",
+                tooltips: true,
+                selectable: 1,
+                selectableRollingSelection: false
+            });
+
+            // Handle row selection for clustered table
+            clusteredResultsTable.on("rowClick", function(e, row) {
+                const rowData = row.getData();
+                
+                // Update chain selector to match the selected row's chain
+                const chainSelect = document.getElementById('chainSelect');
+                if (chainSelect && currentChain === 'all') {
+                    chainSelect.value = rowData.chain;
+                    currentChain = rowData.chain;
+                }
+                
+                // Use chain field for highlighting
+                const convertedRowData = {
+                    chain: rowData.chain,
+                    i: rowData.i,
+                    j: rowData.j,
+                    crossingsN: rowData.crossingsN,
+                    crossingsC: rowData.crossingsC
+                };
+                
+                highlightEntanglement(convertedRowData);
+            });
+        }
+
         // Load structure into NGL viewer
         function loadStructureIntoNGL(pdbContent) {
             const viewport = document.getElementById('nglViewport');
@@ -514,6 +768,8 @@
         function highlightEntanglement(rowData) {
             if (!nglStage || nglStage.compList.length === 0) return;
             
+            console.log('highlightEntanglement called with:', rowData);
+            
             const component = nglStage.compList[0];
             
             // Remove previous highlights
@@ -535,18 +791,28 @@
                 });
             }
             
-            // Parse crossings (stored as comma-separated strings like "+396, +400")
-            const crossingsN = rowData.crossingsN ? rowData.crossingsN.split(',').map(s => {
-                const num = s.trim().replace(/[+\-]/g, '');
-                return parseInt(num);
-            }).filter(n => !isNaN(n)) : [];
+            // Parse crossings - handle null, undefined, empty string, and '?' values
+            const parseCrossings = (crossingStr) => {
+                if (!crossingStr || crossingStr === '' || crossingStr === '?' || crossingStr === 'nan') {
+                    return [];
+                }
+                return crossingStr.split(',').map(s => {
+                    const num = s.trim().replace(/[+\-]/g, '');
+                    return parseInt(num);
+                }).filter(n => !isNaN(n) && n > 0);
+            };
             
-            const crossingsC = rowData.crossingsC ? rowData.crossingsC.split(',').map(s => {
-                const num = s.trim().replace(/[+\-]/g, '');
-                return parseInt(num);
-            }).filter(n => !isNaN(n)) : [];
-            
+            const crossingsN = parseCrossings(rowData.crossingsN);
+            const crossingsC = parseCrossings(rowData.crossingsC);
             const allCrossings = [...crossingsN, ...crossingsC];
+            
+            console.log('Parsed crossings:', {
+                crossingsN_raw: rowData.crossingsN,
+                crossingsC_raw: rowData.crossingsC,
+                crossingsN,
+                crossingsC,
+                allCrossings
+            });
             
             // 2. Highlight loop (i to j) in BRIGHT RED cartoon
             const chainSele = `:${rowData.chain}`;
@@ -594,8 +860,8 @@
             }
             
             // Center view on the entanglement region
-            const minRes = Math.min(rowData.i, ...allCrossings);
-            const maxRes = Math.max(rowData.j, ...allCrossings);
+            const minRes = allCrossings.length > 0 ? Math.min(rowData.i, ...allCrossings) : rowData.i;
+            const maxRes = allCrossings.length > 0 ? Math.max(rowData.j, ...allCrossings) : rowData.j;
             component.autoView(`${chainSele} and ${minRes}-${maxRes}`, 500);
         }
 
@@ -658,7 +924,10 @@
         }
 
         // Initialize on page load
-        window.addEventListener('DOMContentLoaded', loadJobData);
+        window.addEventListener('DOMContentLoaded', function() {
+            setupTableToggles();
+            loadJobData();
+        });
     </script>
 </body>
 </html>

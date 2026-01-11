@@ -11,6 +11,7 @@ from datetime import datetime
 import uuid
 import json
 import os
+import pandas as pd
 from pathlib import Path
 
 Base = declarative_base()
@@ -73,7 +74,7 @@ class Job(Base):
 
 
 class Result(Base):
-    """Entanglement results table"""
+    """Entanglement results table (Native_GE)"""
     __tablename__ = 'results'
     
     result_id = Column(Integer, primary_key=True, autoincrement=True)
@@ -116,6 +117,91 @@ class Result(Base):
             'TLNc': self.TLNc,
             'CCbond': self.CCbond,
             'ENT': self.ENT
+        }
+
+
+class HQResult(Base):
+    """High-quality entanglement results table (Native_HQ_GE)"""
+    __tablename__ = 'hq_results'
+    
+    result_id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.job_id'), nullable=False, index=True)
+    ID = Column(String)  # Structure/PDB ID
+    chain = Column(String, nullable=False)
+    i = Column(Integer, nullable=False)
+    j = Column(Integer, nullable=False)
+    c = Column(String, nullable=True)  # Combined crossings (crossingsN + crossingsC)
+    gn = Column(Float, nullable=False)
+    gc = Column(Float, nullable=False)
+    GLNn = Column(Integer, nullable=False)
+    GLNc = Column(Integer, nullable=False)
+    CCbond = Column(Boolean, nullable=False)
+    ENT = Column(Boolean, nullable=False)
+    
+    def __repr__(self):
+        return f"<HQResult(job_id='{self.job_id}', chain='{self.chain}', i={self.i}, j={self.j})>"
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'result_id': self.result_id,
+            'job_id': self.job_id,
+            'ID': self.ID,
+            'chain': self.chain,
+            'i': self.i,
+            'j': self.j,
+            'c': self.c,
+            'gn': self.gn,
+            'gc': self.gc,
+            'Gn': self.GLNn,
+            'Gc': self.GLNc,
+            'CCbond': self.CCbond,
+            'ENT': self.ENT
+        }
+
+
+class ClusteredResult(Base):
+    """Clustered Native_HQ_GE results table"""
+    __tablename__ = 'clustered_results'
+    
+    result_id = Column(Integer, primary_key=True, autoincrement=True)
+    job_id = Column(String, ForeignKey('jobs.job_id'), nullable=False)
+    ID = Column(String)  # PDB ID / Structure ID
+    chain = Column(String)  # Chain identifier
+    i = Column(Integer, nullable=False)
+    j = Column(Integer, nullable=False)
+    crossingsN = Column(String)  # N-terminal crossings (e.g., "+12,+15")
+    crossingsC = Column(String)  # C-terminal crossings (e.g., "+354,-355")
+    gn = Column(Float)
+    gc = Column(Float)
+    GLNn = Column(Integer)  # Gaussian linking number N-terminal
+    GLNc = Column(Integer)  # Gaussian linking number C-terminal
+    TLNn = Column(Integer)  # Topological linking number N-terminal
+    TLNc = Column(Integer)  # Topological linking number C-terminal
+    num_contacts = Column(Integer)  # Number of native contacts in this cluster
+    contacts = Column(String)  # Semicolon-separated contact ranges (e.g., "96-135;102-128")
+    CCBond = Column(Boolean)  # Whether this involves a disulfide bond
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'result_id': self.result_id,
+            'job_id': self.job_id,
+            'ID': self.ID,
+            'chain': self.chain,
+            'i': self.i,
+            'j': self.j,
+            'crossingsN': self.crossingsN,
+            'crossingsC': self.crossingsC,
+            'gn': self.gn,
+            'gc': self.gc,
+            'GLNn': self.GLNn,
+            'GLNc': self.GLNc,
+            'TLNn': self.TLNn,
+            'TLNc': self.TLNc,
+            'num_contacts': self.num_contacts,
+            'contacts': self.contacts,
+            'CCBond': self.CCBond
         }
 
 
@@ -184,8 +270,8 @@ class Database:
         finally:
             session.close()
     
-    def save_results(self, job_id, results_df, pdb_id=None):
-        """Save analysis results for a job"""
+    def save_results(self, job_id, results_df, pdb_id=None, hq_results_df=None, clustered_results_df=None):
+        """Save analysis results for a job (Native_GE, Native_HQ_GE, and optionally Native_clustered_HQ_GE)"""
         session = self.get_session()
         try:
             # Update job with metadata
@@ -195,17 +281,27 @@ class Database:
             
             job.pdb_id = pdb_id
             job.num_entanglements = len(results_df)
-            job.num_chains = results_df['chain'].nunique() if 'chain' in results_df.columns else 1
             
-            # Save results
+            # Extract unique chains from the dataframe
+            # EntDetect doesn't have a 'chain' column, so we need to extract it from residue ranges
+            # For now, default to 'A' if not present
+            if 'chain' in results_df.columns:
+                job.num_chains = results_df['chain'].nunique()
+            else:
+                job.num_chains = 1  # Single chain assumed
+            
+            # Save Native_GE results
             for _, row in results_df.iterrows():
+                # Get chain - EntDetect may not have this column, default to 'A'
+                chain = row.get('chain', 'A') if row.get('chain') else 'A'
+                
                 result = Result(
                     job_id=job_id,
-                    chain=row.get('chain', ''),
+                    chain=chain,
                     i=int(row['i']),
                     j=int(row['j']),
-                    crossingsN=str(row.get('crossingsN', '')) if row.get('crossingsN') else '',
-                    crossingsC=str(row.get('crossingsC', '')) if row.get('crossingsC') else '',
+                    crossingsN=str(row.get('crossingsN', '')) if row.get('crossingsN') and not pd.isna(row.get('crossingsN')) else '',
+                    crossingsC=str(row.get('crossingsC', '')) if row.get('crossingsC') and not pd.isna(row.get('crossingsC')) else '',
                     gn=float(row['gn']),
                     gc=float(row['gc']),
                     GLNn=int(row['GLNn']),
@@ -216,6 +312,54 @@ class Database:
                     ENT=bool(row['ENT'])
                 )
                 session.add(result)
+            
+            # Save Native_HQ_GE results if available
+            if hq_results_df is not None and len(hq_results_df) > 0:
+                for _, row in hq_results_df.iterrows():
+                    # Get crossingsN and crossingsC directly
+                    crossings_n = str(row.get('crossingsN', '')) if pd.notna(row.get('crossingsN')) else ''
+                    crossings_c = str(row.get('crossingsC', '')) if pd.notna(row.get('crossingsC')) else ''
+                    # Combine for storage in 'c' column (for backward compatibility with HQResult table)
+                    combined_crossings = f"{crossings_n};{crossings_c}" if crossings_n or crossings_c else ''
+                    
+                    hq_result = HQResult(
+                        job_id=job_id,
+                        ID=str(row.get('ID', '')),
+                        chain=str(row.get('chain', '')),
+                        i=int(row['i']),
+                        j=int(row['j']),
+                        c=combined_crossings,
+                        gn=float(row['gn']),
+                        gc=float(row['gc']),
+                        GLNn=int(row['GLNn']),
+                        GLNc=int(row['GLNc']),
+                        CCbond=bool(row['CCbond']),
+                        ENT=bool(row['ENT'])
+                    )
+                    session.add(hq_result)
+            
+            # Save clustered results if available
+            if clustered_results_df is not None and len(clustered_results_df) > 0:
+                for _, row in clustered_results_df.iterrows():
+                    clustered_result = ClusteredResult(
+                        job_id=job_id,
+                        ID=str(row.get('ID', '')),
+                        chain=str(row.get('chain', '')),
+                        i=int(row['i']),
+                        j=int(row['j']),
+                        crossingsN=str(row.get('crossingsN', '')) if pd.notna(row.get('crossingsN')) else '',
+                        crossingsC=str(row.get('crossingsC', '')) if pd.notna(row.get('crossingsC')) else '',
+                        gn=float(row['gn']),
+                        gc=float(row['gc']),
+                        GLNn=int(row.get('GLNn', 0)),
+                        GLNc=int(row.get('GLNc', 0)),
+                        TLNn=int(row.get('TLNn', 0)),
+                        TLNc=int(row.get('TLNc', 0)),
+                        num_contacts=int(row.get('num_contacts', 1)),
+                        contacts=str(row.get('contacts', '')) if pd.notna(row.get('contacts')) else '',
+                        CCBond=bool(row.get('CCBond', False))
+                    )
+                    session.add(clustered_result)
             
             session.commit()
             self.backup_to_json()
@@ -236,7 +380,7 @@ class Database:
             session.close()
     
     def get_job_with_results(self, job_id):
-        """Get job with all its results"""
+        """Get job with all its results (Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE)"""
         session = self.get_session()
         try:
             job = session.query(Job).filter_by(job_id=job_id).first()
@@ -244,9 +388,14 @@ class Database:
                 return None
             
             results = session.query(Result).filter_by(job_id=job_id).all()
+            hq_results = session.query(HQResult).filter_by(job_id=job_id).all()
+            clustered_results = session.query(ClusteredResult).filter_by(job_id=job_id).all()
+            
             return {
                 'job': job.to_dict(include_email=False),
-                'results': [r.to_dict() for r in results]
+                'results': [r.to_dict() for r in results],
+                'hq_results': [r.to_dict() for r in hq_results],
+                'clustered_results': [r.to_dict() for r in clustered_results]
             }
         finally:
             session.close()
@@ -261,7 +410,11 @@ class Database:
             for job in jobs:
                 job_data = job.to_dict(include_email=True)
                 results = session.query(Result).filter_by(job_id=job.job_id).all()
+                hq_results = session.query(HQResult).filter_by(job_id=job.job_id).all()
+                clustered_results = session.query(ClusteredResult).filter_by(job_id=job.job_id).all()
                 job_data['results'] = [r.to_dict() for r in results]
+                job_data['hq_results'] = [r.to_dict() for r in hq_results]
+                job_data['clustered_results'] = [r.to_dict() for r in clustered_results]
                 backup_data.append(job_data)
             
             with open(self.json_backup_path, 'w') as f:

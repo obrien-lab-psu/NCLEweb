@@ -9,13 +9,48 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
-from gaussian_entanglement import GaussianEntanglement
+from EntDetect.gaussian_entanglement import GaussianEntanglement
 import pandas as pd
+import MDAnalysis as mda
+
+# Try to import clustering - it may not be available in all environments
+try:
+    from EntDetect.clustering import ClusterNativeEntanglements
+    CLUSTERING_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Clustering not available: {e}")
+    CLUSTERING_AVAILABLE = False
 
 
-def calculate_native_ge(pdb_path, cleanup=True):
+def get_chains(pdb_path):
+    """
+    Detect all chains in a PDB structure using MDAnalysis.
+    
+    Parameters
+    ----------
+    pdb_path : str
+        Path to PDB file
+        
+    Returns
+    -------
+    list
+        List of chain identifiers (e.g., ['A', 'B', 'C'])
+    """
+    try:
+        u = mda.Universe(pdb_path)
+        chains = sorted(set(u.atoms.chainIDs))
+        # Filter out empty chain IDs
+        chains = [c for c in chains if c and c.strip()]
+        return chains if chains else ['']  # Return [''] if no chains found
+    except Exception as e:
+        print(f"Warning: Could not detect chains: {e}")
+        return ['']  # Return single empty chain on error
+
+
+def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli"):
     """
     Calculate native Gaussian entanglement for a PDB file.
+    Runs Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE analyses.
     
     Parameters
     ----------
@@ -23,6 +58,10 @@ def calculate_native_ge(pdb_path, cleanup=True):
         Path to the input PDB file
     cleanup : bool, optional
         Whether to clean up temporary files after analysis, by default True
+    structure_type : str, optional
+        Structure type: "EXP" for experimental or "AF" for AlphaFold, by default "EXP"
+    organism : str, optional
+        Organism for clustering: "Ecoli", "Human", or "Yeast", by default "Ecoli"
         
     Returns
     -------
@@ -30,7 +69,11 @@ def calculate_native_ge(pdb_path, cleanup=True):
         Dictionary containing:
         - 'success': bool indicating if analysis succeeded
         - 'data': pandas DataFrame with raw GE results (if success=True)
-        - 'csv': str with CSV-formatted results (if success=True)
+        - 'csv': str with CSV-formatted Native_GE results (if success=True)
+        - 'hq_data': pandas DataFrame with HQ filtered results (if success=True)
+        - 'hq_csv': str with CSV-formatted Native_HQ_GE results (if success=True)
+        - 'clustered_data': pandas DataFrame with clustered results (if success=True)
+        - 'clustered_csv': str with CSV-formatted clustered results (if success=True)
         - 'error': str with error message (if success=False)
         - 'pdb_id': str identifier from filename
     """
@@ -39,6 +82,10 @@ def calculate_native_ge(pdb_path, cleanup=True):
         'success': False,
         'data': None,
         'csv': None,
+        'hq_data': None,
+        'hq_csv': None,
+        'clustered_data': None,
+        'clustered_csv': None,
         'error': None,
         'pdb_id': None
     }
@@ -47,8 +94,22 @@ def calculate_native_ge(pdb_path, cleanup=True):
     pdb_id = Path(pdb_path).stem
     result['pdb_id'] = pdb_id
     
+    # Detect chains in the structure
+    chains = get_chains(pdb_path)
+    print(f"Detected {len(chains)} chain(s): {chains}")
+    
     # Create temporary directory for output
     temp_dir = tempfile.mkdtemp(prefix=f'ge_analysis_{pdb_id}_')
+    
+    # Store results from all chains
+    all_native_dfs = []
+    all_hq_dfs = []
+    all_clustered_dfs = []
+    
+    # Store results from all chains
+    all_native_dfs = []
+    all_hq_dfs = []
+    all_clustered_dfs = []
     
     try:
         # Verify input file exists
@@ -56,34 +117,138 @@ def calculate_native_ge(pdb_path, cleanup=True):
             result['error'] = f"PDB file not found: {pdb_path}"
             return result
         
-        # Initialize GaussianEntanglement with default parameters
-        # g_threshold=0.6, density=0.0, Calpha=False (use heavy atoms)
-        ge = GaussianEntanglement(
-            g_threshold=0.6, 
-            density=0.0, 
-            Calpha=False, 
-            CG=False
-        )
+        # Process each chain
+        for chain in chains:
+            # Use chain-specific ID if multiple chains
+            if len(chains) > 1:
+                chain_id = f"{pdb_id}_{chain}" if chain else pdb_id
+            else:
+                chain_id = pdb_id
+                
+            print(f"\n{'='*60}")
+            print(f"Processing chain: {chain if chain else '(no chain)'}")
+            print(f"Chain ID: {chain_id}")
+            print(f"{'='*60}")
+            
+            # Create chain-specific directories
+            chain_temp_dir = os.path.join(temp_dir, f'chain_{chain}' if chain else 'chain_default')
+            hq_temp_dir = os.path.join(chain_temp_dir, 'HQ')
+            os.makedirs(hq_temp_dir, exist_ok=True)
+            
+            # Initialize GaussianEntanglement with default parameters
+            # g_threshold=0.6, density=0.0, Calpha=False (use heavy atoms)
+            ge = GaussianEntanglement(
+                g_threshold=0.6, 
+                density=0.0, 
+                Calpha=False, 
+                CG=False
+            )
+            
+            # Calculate native entanglements (Step 1: Native_GE)
+            print(f"Analyzing {chain_id}...")
+            native_ent = ge.calculate_native_entanglements(
+                pdb_file=pdb_path,
+                outdir=chain_temp_dir,
+                ID=chain_id,
+                chain=chain if chain else None
+            )
+            
+            # Extract Native_GE results
+            df = native_ent['ent_result']
+            if len(df) > 0:
+                all_native_dfs.append(df)
+                print(f"Native_GE complete for chain {chain}. Found {len(df)} results.")
+            else:
+                print(f"No entanglements found for chain {chain}. Skipping.")
+                continue
+            
+            # Calculate high-quality entanglements (Step 2: Native_HQ_GE)
+            print(f"Filtering for high-quality entanglements...")
+            try:
+                hq_ent = ge.select_high_quality_entanglements(
+                    GE_filepath=native_ent['outfile'],
+                    pdb=pdb_path,
+                    outdir=hq_temp_dir,
+                    ID=chain_id,
+                    model=structure_type,  # Use user-selected structure type (EXP or AF)
+                    mapping='None',  # No mapping file
+                    chain=chain if chain else None
+                )
+                
+                # Extract Native_HQ_GE results
+                hq_df = hq_ent['GE_data']
+                if len(hq_df) > 0:
+                    all_hq_dfs.append(hq_df)
+                    print(f"Native_HQ_GE complete for chain {chain}. Found {len(hq_df)} high-quality results.")
+                else:
+                    print(f"No high-quality entanglements found for chain {chain}.")
+                
+                # Calculate clustered entanglements (Step 3: Native_clustered_HQ_GE)
+                if CLUSTERING_AVAILABLE and len(hq_df) > 0:
+                    print(f"Clustering high-quality entanglements with organism={organism}...")
+                    try:
+                        clustering = ClusterNativeEntanglements(organism=organism)
+                        clustered_temp_dir = os.path.join(chain_temp_dir, 'Clustered')
+                        os.makedirs(clustered_temp_dir, exist_ok=True)
+                        
+                        clustered_ent = clustering.Cluster_NativeEntanglements(
+                            GE_filepath=hq_ent['outfile'],
+                            outdir=clustered_temp_dir,
+                            outfile=f"{chain_id}_clustered.csv"
+                        )
+                        
+                        # Extract clustered results
+                        clustered_df = clustered_ent['ent_result']
+                        if len(clustered_df) > 0:
+                            all_clustered_dfs.append(clustered_df)
+                            print(f"Native_clustered_HQ_GE complete for chain {chain}. Found {len(clustered_df)} clustered results.")
+                        else:
+                            print(f"No clustered entanglements found for chain {chain}.")
+                    except Exception as e:
+                        print(f"Warning: Clustering failed for chain {chain}: {e}")
+                        # Continue even if clustering fails for this chain
+                        
+            except Exception as e:
+                print(f"Warning: HQ filtering failed for chain {chain}: {e}")
+                # Continue with next chain even if HQ fails
         
-        # Calculate native entanglements
-        print(f"Analyzing {pdb_id}...")
-        native_ent = ge.calculate_native_entanglements(
-            pdb_file=pdb_path,
-            outdir=temp_dir,
-            ID=pdb_id
-        )
-        
-        # Extract results
-        df = native_ent['ent_result']
-        
-        # Convert to CSV string (using pipe delimiter as in original)
-        csv_output = df.to_csv(sep='|', index=False)
-        
-        result['success'] = True
-        result['data'] = df
-        result['csv'] = csv_output
-        
-        print(f"Analysis complete. Found {len(df)} results.")
+        # Combine results from all chains
+        if all_native_dfs:
+            combined_native_df = pd.concat(all_native_dfs, ignore_index=True)
+            csv_output = combined_native_df.to_csv(sep='|', index=False)
+            result['success'] = True
+            result['data'] = combined_native_df
+            result['csv'] = csv_output
+            print(f"\nCombined Native_GE: {len(combined_native_df)} total results from {len(all_native_dfs)} chain(s)")
+        else:
+            result['error'] = "No entanglements found in any chain"
+            return result
+            
+        if all_hq_dfs:
+            combined_hq_df = pd.concat(all_hq_dfs, ignore_index=True)
+            hq_csv_output = combined_hq_df.to_csv(sep='|', index=False)
+            result['hq_data'] = combined_hq_df
+            result['hq_csv'] = hq_csv_output
+            print(f"Combined Native_HQ_GE: {len(combined_hq_df)} total results from {len(all_hq_dfs)} chain(s)")
+        else:
+            result['hq_data'] = None
+            result['hq_csv'] = None
+            print("No high-quality entanglements found in any chain")
+            
+        if all_clustered_dfs:
+            combined_clustered_df = pd.concat(all_clustered_dfs, ignore_index=True)
+            clustered_csv_output = combined_clustered_df.to_csv(sep='|', index=False)
+            result['clustered_data'] = combined_clustered_df
+            result['clustered_csv'] = clustered_csv_output
+            print(f"Combined Native_clustered_HQ_GE: {len(combined_clustered_df)} total results from {len(all_clustered_dfs)} chain(s)")
+        elif CLUSTERING_AVAILABLE:
+            result['clustered_data'] = None
+            result['clustered_csv'] = None
+            print("No clustered entanglements found in any chain")
+        else:
+            result['clustered_data'] = None
+            result['clustered_csv'] = None
+            print("Clustering module not available (pyemma dependency missing)")
         
     except Exception as e:
         result['error'] = str(e)

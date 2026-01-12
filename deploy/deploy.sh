@@ -16,8 +16,8 @@ fi
 
 # Configuration
 PROJECT_DIR="/home/ianms/git_repos/NCLEweb"
-DOMAIN="your_domain.com"  # Change this to your domain
-EMAIL="your_email@example.com"  # Change this for Let's Encrypt
+DOMAIN="ncleweb.org"
+EMAIL="nclewebnotifications@gmail.com"  # For Let's Encrypt notifications
 
 echo ""
 echo "Step 1: Installing dependencies..."

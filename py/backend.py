@@ -324,7 +324,8 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
         session = db.get_session()
         job = session.query(Job).filter_by(job_id=job_id).first()
         if job:
-            results_url = f"{base_url}/results.html?job_id={job_id}"
+            # Use domain name for public-facing URLs
+            results_url = f"https://ncleweb.org/results.html?job_id={job_id}"
             email_notifier.send_completion_email(
                 job.email,
                 job.job_name,

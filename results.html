@@ -711,20 +711,85 @@
                 // Check if structure is coarse-grained by looking for model resolution flag
                 const isCoarseGrained = currentJobData && currentJobData.coarse_grained;
                 
+                console.log('=== NGL Viewer Debug Info ===');
+                console.log('isCoarseGrained:', isCoarseGrained);
+                console.log('Structure info:', {
+                    atomCount: component.structure.atomCount,
+                    residueCount: component.structure.residueCount,
+                    chainCount: component.structure.chainStore.count
+                });
+                
+                // Check residue information more thoroughly
+                let residueInfo = [];
+                component.structure.eachResidue(residue => {
+                    if (residueInfo.length < 5) { // Just first 5 residues
+                        residueInfo.push({
+                            resno: residue.resno,
+                            resname: residue.resname,
+                            atomCount: residue.atomCount,
+                            chainname: residue.chainname
+                        });
+                    }
+                });
+                console.log('First 5 residues:', residueInfo);
+                console.log('Total residues via eachResidue:', (() => {
+                    let count = 0;
+                    component.structure.eachResidue(() => count++);
+                    return count;
+                })());
+                
+                // Check what atoms are in the structure
+                const atomNames = new Set();
+                component.structure.eachAtom(atom => {
+                    atomNames.add(atom.atomname);
+                });
+                console.log('Atom names in structure:', Array.from(atomNames));
+                
+                // Test selectors
+                const caSelection = component.structure.getAtomSet('@CA');
+                const aSelection = component.structure.getAtomSet('@A');
+                console.log('Atoms matching @CA:', caSelection ? caSelection.getSize() : 0);
+                console.log('Atoms matching @A:', aSelection ? aSelection.getSize() : 0);
+                
                 if (isCoarseGrained) {
-                    // Use spacefill + line representation for coarse-grained structures
-                    component.addRepresentation("spacefill", {
-                        colorScheme: "chainname",
-                        radius: 1.0
+                    console.log('Using coarse-grained representation');
+                    
+                    // Check component bounds
+                    const bbox = component.structure.getBoundingBox();
+                    console.log('Structure bounding box:', bbox);
+                    console.log('Structure center:', component.structure.center);
+                    
+                    // Ball+stick representation with NO atom selector
+                    const repr = component.addRepresentation("ball+stick", {
+                        // NO sele parameter - should render everything
+                        colorScheme: "element",
+                        aspectRatio: 2.0,
+                        radiusScale: 2.0
                     });
-                    component.addRepresentation("distance", {
-                        colorScheme: "chainname",
-                        labelVisible: false,
-                        useCylinder: true,
-                        radiusScale: 0.3,
-                        maxDistance: 5.0  // Only show bonds between nearby beads
+                    console.log('Representation added:', repr);
+                    console.log('Representation list count:', component.reprList.length);
+                    
+                    // Check what was actually created
+                    console.log('Repr details:', {
+                        type: repr.repr.type,
+                        parameters: repr.parameters,
+                        bufferList: repr.repr.bufferList ? repr.repr.bufferList.length : 'N/A'
                     });
+                    
+                    // Force a render
+                    component.stage.viewer.requestRender();
+                    
+                    // Wait a moment for render and check
+                    setTimeout(() => {
+                        console.log('After render - representation status:', {
+                            visible: repr.visible,
+                            disposed: repr.disposed,
+                            atomCount: repr.repr ? repr.repr.count : 'N/A',
+                            buffers: repr.repr.bufferList ? repr.repr.bufferList.length : 0
+                        });
+                    }, 100);
                 } else {
+                    console.log('Using cartoon representation');
                     // Use cartoon representation for all-atom structures
                     component.addRepresentation("cartoon", {
                         colorScheme: "chainname"
@@ -780,14 +845,7 @@
                 if (isCoarseGrained) {
                     component.addRepresentation("spacefill", {
                         colorScheme: "chainname",
-                        radius: 1.0
-                    });
-                    component.addRepresentation("distance", {
-                        colorScheme: "chainname",
-                        labelVisible: false,
-                        useCylinder: true,
-                        radiusScale: 0.3,
-                        maxDistance: 5.0
+                        scale: 1.0
                     });
                 } else {
                     component.addRepresentation("cartoon", {
@@ -799,15 +857,7 @@
                     component.addRepresentation("spacefill", {
                         sele: `:${currentChain}`,
                         colorScheme: "chainname",
-                        radius: 1.0
-                    });
-                    component.addRepresentation("distance", {
-                        sele: `:${currentChain}`,
-                        colorScheme: "chainname",
-                        labelVisible: false,
-                        useCylinder: true,
-                        radiusScale: 0.3,
-                        maxDistance: 5.0
+                        scale: 1.0
                     });
                 } else {
                     component.addRepresentation("cartoon", {
@@ -817,6 +867,7 @@
                 }
             }
         }
+
 
         // Highlight entanglement
         function highlightEntanglement(rowData) {
@@ -831,25 +882,34 @@
             component.removeAllRepresentations();
             
             // Determine representation type based on model
-            const baseRepType = isCoarseGrained ? "ball+stick" : "cartoon";
-            const highlightRepType = isCoarseGrained ? "ball+stick" : "cartoon";
+            // (kept for readability / future use)
+            const baseRepType = isCoarseGrained ? "backbone" : "cartoon";
+            const highlightRepType = isCoarseGrained ? "backbone" : "cartoon";
+
+            // Helper: atom selector for CA-coarse-grain files
+            // - Your older CG PDBs may use atom name "A"
+            // - NGL backbone likes CA; using both keeps it robust
+            const cgAtomSele = "(@CA or @A)";
+            
+            console.log('=== cgAtomSele Debug ===');
+            console.log('cgAtomSele value:', cgAtomSele);
+            console.log('isCoarseGrained:', isCoarseGrained);
+            
+            // Test if cgAtomSele matches any atoms
+            if (isCoarseGrained) {
+                const cgSelection = component.structure.getAtomSet(cgAtomSele);
+                console.log('Atoms matching cgAtomSele:', cgSelection ? cgSelection.getSize() : 0);
+            }
             
             // 1. Base representation - show based on chain selection in grey
             if (currentChain === 'all') {
                 // Show all chains in grey
                 if (isCoarseGrained) {
-                    component.addRepresentation("spacefill", {
-                        color: "grey",
-                        opacity: 0.3,
-                        radius: 0.8
-                    });
-                    component.addRepresentation("distance", {
-                        color: "grey",
-                        opacity: 0.3,
-                        labelVisible: false,
-                        useCylinder: true,
-                        radiusScale: 0.2,
-                        maxDistance: 5.0
+                    component.addRepresentation("ball+stick", {
+                        color: "lightgrey",
+                        aspectRatio: 2.0,
+                        radiusScale: 2.0,
+                        opacity: 0.6
                     });
                 } else {
                     component.addRepresentation("cartoon", {
@@ -860,20 +920,12 @@
             } else {
                 // Show only selected chain in grey
                 if (isCoarseGrained) {
-                    component.addRepresentation("spacefill", {
+                    component.addRepresentation("ball+stick", {
                         sele: `:${currentChain}`,
-                        color: "grey",
-                        opacity: 0.3,
-                        radius: 0.8
-                    });
-                    component.addRepresentation("distance", {
-                        sele: `:${currentChain}`,
-                        color: "grey",
-                        opacity: 0.3,
-                        labelVisible: false,
-                        useCylinder: true,
-                        radiusScale: 0.2,
-                        maxDistance: 5.0
+                        color: "lightgrey",
+                        aspectRatio: 2.0,
+                        radiusScale: 2.0,
+                        opacity: 0.6
                     });
                 } else {
                     component.addRepresentation("cartoon", {
@@ -910,19 +962,11 @@
             // 2. Highlight loop (i to j) in BRIGHT RED
             const chainSele = `:${rowData.chain}`;
             if (isCoarseGrained) {
-                component.addRepresentation("spacefill", {
+                component.addRepresentation("ball+stick", {
                     sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
                     color: "#FF0000",  // Bright red
-                    radius: 1.2,
-                    opacity: 1.0
-                });
-                component.addRepresentation("distance", {
-                    sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
-                    color: "#FF0000",
-                    labelVisible: false,
-                    useCylinder: true,
-                    radiusScale: 0.4,
-                    maxDistance: 5.0,
+                    aspectRatio: 2.0,
+                    radiusScale: 2.0,
                     opacity: 1.0
                 });
             } else {
@@ -943,24 +987,18 @@
                     const end = res + 3;
                     crossingSelections.push(`${start}-${end}`);
                 });
-                const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
+
                 if (isCoarseGrained) {
-                    component.addRepresentation('spacefill', {
+                    const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
+                    component.addRepresentation('ball+stick', {
                         sele: crossingSele,
                         color: '#0000FF',  // Bright blue
-                        radius: 1.2,
-                        opacity: 1.0
-                    });
-                    component.addRepresentation('distance', {
-                        sele: crossingSele,
-                        color: '#0000FF',
-                        labelVisible: false,
-                        useCylinder: true,
-                        radiusScale: 0.4,
-                        maxDistance: 5.0,
+                        aspectRatio: 2.0,
+                        radiusScale: 2.0,
                         opacity: 1.0
                     });
                 } else {
+                    const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
                     component.addRepresentation('cartoon', {
                         sele: crossingSele,
                         color: '#0000FF',  // Bright blue
@@ -975,23 +1013,26 @@
             component.addRepresentation("spacefill", {
                 sele: `${chainSele} and (${rowData.i} or ${rowData.j})`,
                 color: "#FF0000",  // Bright red
-                scale: 0.8
+                scale: 1.2
             });
             
             // 5. Add VDW (spacefill) for crossing residues in BRIGHT BLUE
             if (allCrossings.length > 0) {
                 const crossingVdwSele = `${chainSele} and (${allCrossings.join(' or ')})`;
+
                 component.addRepresentation('spacefill', {
                     sele: crossingVdwSele,
                     color: '#0000FF',  // Bright blue
-                    scale: 0.8
+                    scale: 1.2
                 });
             }
             
             // Center view on the entanglement region
             const minRes = allCrossings.length > 0 ? Math.min(rowData.i, ...allCrossings) : rowData.i;
             const maxRes = allCrossings.length > 0 ? Math.max(rowData.j, ...allCrossings) : rowData.j;
-            component.autoView(`${chainSele} and ${minRes}-${maxRes}`, 500);
+
+            const autoViewSele = `${chainSele} and ${minRes}-${maxRes}`;
+            component.autoView(autoViewSele, 500);
         }
 
         // Reset view
@@ -1000,6 +1041,7 @@
                 nglStage.compList[0].autoView();
             }
         });
+
 
         // Clear selection
         document.getElementById('clearSelection')?.addEventListener('click', () => {

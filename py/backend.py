@@ -509,6 +509,8 @@ async def get_job_details(job_id: str):
             'status': job_data['job']['status'],
             'num_entanglements': job_data['job']['num_entanglements'],
             'num_chains': job_data['job']['num_chains'],
+            'coarse_grained': job_data['job']['coarse_grained'],
+            'ca_contact': job_data['job']['ca_contact'],
             'results': job_data['results'],
             'hq_results': hq_results,
             'clustered_results': clustered_results,

@@ -176,8 +176,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                     outdir=hq_temp_dir,
                     ID=chain_id,
                     model=structure_type,  # Use user-selected structure type (EXP or AF)
-                    mapping='None',  # No mapping file
-                    chain=chain if chain else None
+                    mapping='None'  # No mapping file
                 )
                 
                 # Extract Native_HQ_GE results
@@ -205,6 +204,11 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         # Extract clustered results
                         clustered_df = clustered_ent['ent_result']
                         if len(clustered_df) > 0:
+                            # The updated EntDetect clustering module now outputs the complete schema:
+                            # ID|chain|i|j|crossingsN|crossingsC|gn|gc|GLNn|GLNc|TLNn|TLNc|num_contacts|contacts|CCBond
+                            # Just add ENT column which is always True for clustered results
+                            clustered_df['ENT'] = True
+                            
                             all_clustered_dfs.append(clustered_df)
                             print(f"Native_clustered_HQ_GE complete for chain {chain}. Found {len(clustered_df)} clustered results.")
                         else:

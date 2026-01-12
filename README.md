@@ -95,25 +95,39 @@ pkill -f gunicorn
 
 **Prerequisites:**
 ```bash
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Or manually:
-pip install fastapi uvicorn gunicorn python-dotenv sqlalchemy pandas biopython
+# Install EntDetect (required for gaussian entanglement analysis)
+pip install git+https://github.com/obrien-lab-psu/EntDetect.git
+
+# Install additional packages
+pip install sqlalchemy python-multipart
 ```
 
 **Run backend (development mode):**
 ```bash
 cd ~/git_repos/NCLEweb
 source venv/bin/activate
-uvicorn py.backend:app --reload --host 0.0.0.0 --port 8000
+
+# Start backend on port 8001 (or any available port)
+uvicorn py.backend:app --reload --host 127.0.0.1 --port 8001
 ```
 
 **Access locally:**
-- Frontend: http://localhost (if Nginx configured)
-- Backend API: http://localhost:8000
-- Browse jobs: http://localhost/browse.html
-- Submit job: http://localhost/submit.html
+- Open HTML files directly in browser: `file:///path/to/NCLEweb/index.html`
+- Frontend automatically uses localhost:8001 when accessed via file:// protocol
+- Backend API: http://127.0.0.1:8001
+- API docs: http://127.0.0.1:8001/docs
+
+**Note:** The frontend uses dynamic API URLs:
+- When opened locally (file:// protocol): API calls go to http://127.0.0.1:8001
+- When served via production domain: API calls go to https://your-domain.com
+This allows seamless testing locally and deployment to production without code changes.
 
 ---
 

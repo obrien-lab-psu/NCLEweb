@@ -408,7 +408,10 @@
     </div>
     
     <script>
-        const API_BASE_URL = 'http://localhost:8000';
+        // Use localhost for local file testing, otherwise use the same origin as the page
+        const API_BASE_URL = window.location.protocol === 'file:' 
+            ? 'http://127.0.0.1:8001' 
+            : window.location.origin;
         const form = document.getElementById('submitForm');
         const submitBtn = document.getElementById('submitBtn');
         const statusMessage = document.getElementById('statusMessage');

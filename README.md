@@ -1,141 +1,440 @@
-# NCLE Web - Gaussian Entanglement Analysis
+# NCLE Web - Non-covalent Lasso Entanglement Analyzer
 
-Web application for calculating Native Gaussian Entanglement (GE) from PDB structures.
+Web application for calculating Non-covalent Lasso Entanglement from PDB structures using Gaussian Entanglement analysis.
+
+🌐 **Live Site**: https://ncleweb.org
+
+## Current Status
+
+**Demo Deployment** (Home Server)
+- ✅ Live and accessible at https://ncleweb.org
+- ✅ Protected by Cloudflare (DDoS protection, SSL, rate limiting)
+- ✅ Email notifications enabled
+- ✅ Custom organism support with clustering cutoffs
+- 📅 Demo period: 1 week
+- 🔄 Migration to production server planned after approval
 
 ## Architecture
 
-**Frontend (static):**
-* Single-page app: upload PDB, show NGL viewer, show results table
-* Served as static files by Apache
+**Frontend (HTML/CSS/JS):**
+* Landing page with feature showcase
+* Job submission form with organism selection (E. coli, Human, Yeast, Custom)
+* Interactive NGL viewer for structure visualization
+* Results browser with filtering and sorting
+* Served as static files by Nginx
 
 **Backend (Python FastAPI):**
-* Accepts PDB uploads via REST API
-* Runs Gaussian Entanglement analysis
-* Returns raw Native GE results as CSV or JSON
-* Runs with uvicorn behind Apache reverse proxy
+* RESTful API for job submission and management
+* Background job processing with status tracking
+* Email notifications on job completion
+* SQLite database for job persistence
+* Clustering with organism-specific or custom cutoffs
+* Runs with Gunicorn + Uvicorn workers behind Nginx reverse proxy
+
+**Infrastructure:**
+* Nginx reverse proxy on port 80/443
+* Cloudflare CDN and DDoS protection
+* Rate limiting: 10 API requests/minute per IP
+* SSL/TLS encryption (Cloudflare Flexible mode)
 
 **Components:**
-* `py/api_wrapper.py` - Simplified interface to gaussian_entanglement
-* `py/backend.py` - FastAPI server with `/api/analyze` endpoint
-* `py/gaussian_entanglement.py` - Core analysis engine (existing)
+* `py/backend.py` - FastAPI server with job management endpoints
+* `py/api_wrapper.py` - Interface to EntDetect gaussian_entanglement
+* `py/database.py` - SQLite database models and operations
+* `py/email_notifier.py` - SMTP email notification system
+* `index.html` - Landing page
+* `submit.html` - Job submission form
+* `browse.html` - Job browser
+* `results.html` - Results viewer with NGL integration
 
 ---
 
-## Quick Start (Local Development)
+## Quick Start
 
-### Prerequisites
+### For Demo/Production Server Maintenance
+
+**Check server status:**
 ```bash
-pip install fastapi uvicorn[standard] pandas numpy scipy biopython MDAnalysis topoly
+# Backend running?
+ps aux | grep gunicorn | grep -v grep
+
+# Nginx running?
+sudo service nginx status
 ```
 
-### Run Backend
+**View logs:**
 ```bash
-cd py
-python backend.py
+# Backend logs
+tail -f ~/git_repos/NCLEweb/logs/access.log
+tail -f ~/git_repos/NCLEweb/logs/error.log
+
+# Nginx logs
+tail -f ~/git_repos/NCLEweb/logs/nginx_access.log
+tail -f ~/git_repos/NCLEweb/logs/nginx_error.log
 ```
-API available at `http://localhost:8000`
 
-### Test API
+**Restart services if needed:**
 ```bash
-# Health check
-curl http://localhost:8000/
+# Restart backend
+pkill -f 'gunicorn.*backend:app'
+cd ~/git_repos/NCLEweb && nohup ./start_server.sh > /dev/null 2>&1 &
 
-# Analyze PDB
-curl -X POST -F "file=@structure.pdb" http://localhost:8000/api/analyze
+# Restart Nginx
+sudo service nginx restart
+```
 
-# Get JSON results
-curl -X POST -F "file=@structure.pdb" http://localhost:8000/api/analyze-json
+**Update application:**
+```bash
+cd ~/git_repos/NCLEweb
+git pull
+pkill -f gunicorn
+./start_server.sh
+```
+
+### For Local Development
+
+**Prerequisites:**
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Or manually:
+pip install fastapi uvicorn gunicorn python-dotenv sqlalchemy pandas biopython
+```
+
+**Run backend (development mode):**
+```bash
+cd ~/git_repos/NCLEweb
+source venv/bin/activate
+uvicorn py.backend:app --reload --host 0.0.0.0 --port 8000
+```
+
+**Access locally:**
+- Frontend: http://localhost (if Nginx configured)
+- Backend API: http://localhost:8000
+- Browse jobs: http://localhost/browse.html
+- Submit job: http://localhost/submit.html
+
+---
+
+## Deployment
+
+See detailed deployment guides in the `deploy/` directory:
+
+- **`deploy/HOME_SERVER_SETUP.md`** - Complete guide for WSL/home PC deployment (current setup)
+- **`deploy/SERVER_SETUP.md`** - Production server setup (DigitalOcean, Linode, etc.)
+- **`deploy/CLOUDFLARE_SETUP.md`** - Cloudflare configuration and security
+- **`deploy/README.md`** - Deployment overview and options
+
+**Current deployment configuration:**
+- Domain: ncleweb.org
+- Server: Home PC (WSL2 on Windows)
+- Public IP: 71.58.195.248 (forwarded through router)
+- Cloudflare: Proxied (orange cloud ON)
+- SSL Mode: Flexible (Cloudflare → User: HTTPS, Cloudflare → Server: HTTP)
+
+**Quick deployment (WSL):**
+```bash
+./deploy/deploy_wsl.sh
 ```
 
 ---
 
 ## API Endpoints
 
-### `GET /`
-Health check endpoint
+### Job Submission
 
-**Response:**
-```json
-{
-  "status": "online",
-  "service": "NCLE Gaussian Entanglement API",
-  "version": "1.0.0"
-}
-```
+**`POST /api/submit-job`**
 
-### `POST /api/analyze`
-Upload PDB file and get CSV results (pipe-delimited)
+Submit a PDB structure for analysis.
 
 **Request:**
 - Content-Type: multipart/form-data
-- Body: file (PDB file, max 20 MB)
-
-**Response:**
-- Content-Type: text/csv
-- Columns: ID, i, j, crossingsN, crossingsC, gn, gc, GLNn, GLNc, TLNn, TLNc, CCbond, ENT, absent_crossingsN, absent_crossingsC
-
-### `POST /api/analyze-json`
-Upload PDB file and get JSON results
+- Parameters:
+  - `file`: PDB file (max 50MB)
+  - `job_name`: Display name for the job
+  - `uniprot_id`: UniProt ID (optional)
+  - `email`: Email for notifications
+  - `organism`: Ecoli, Human, Yeast, or custom name
+  - `cluster_cutoff`: Clustering cutoff (optional, for custom organisms)
+  - `description`: Job description (optional)
 
 **Response:**
 ```json
 {
   "success": true,
-  "pdb_id": "structure_name",
-  "num_entanglements": 5,
-  "results": [
+  "job_id": "uuid-string",
+  "message": "Job submitted successfully"
+}
+```
+
+### Job Management
+
+**`GET /api/jobs`**
+
+Get list of all jobs with filtering and pagination.
+
+**Parameters:**
+- `status`: Filter by status (pending, processing, completed, failed)
+- `offset`: Pagination offset (default: 0)
+- `limit`: Results per page (default: 50)
+
+**Response:**
+```json
+{
+  "success": true,
+  "total": 100,
+  "count": 50,
+  "offset": 0,
+  "jobs": [
     {
-      "ID": "1ABC",
-      "i": 10,
-      "j": 50,
-      "gn": 0.75,
-      "gc": 0.82,
+      "job_id": "uuid",
+      "job_name": "My Analysis",
+      "status": "completed",
+      "num_entanglements": 42,
+      "upload_timestamp": "2026-01-12T00:00:00",
       ...
     }
   ]
 }
 ```
 
----
+**`GET /api/job/{job_id}`**
 
-## Server Deployment (Apache + Ubuntu)
+Get detailed information about a specific job including results.
 
-### Step 1: Server Setup
-```bash
-# On Ubuntu server
-sudo apt update
-sudo apt install python3 python3-pip python3-venv apache2
-
-# Create project directory
-sudo mkdir -p /var/www/ncleweb
-cd /var/www/ncleweb
-
-# Transfer files (use sftp, git clone, or scp)
-
-# Set up Python environment
-python3 -m venv venv
-source venv/bin/activate
-pip install fastapi uvicorn[standard] pandas numpy scipy biopython MDAnalysis topoly
-
-# Test manually
-cd py
-python backend.py
+**Response:**
+```json
+{
+  "success": true,
+  "job": {
+    "job_id": "uuid",
+    "job_name": "My Analysis",
+    "status": "completed",
+    ...
+  },
+  "results": [...],
+  "hq_results": [...],
+  "clustered_results": [...]
+}
 ```
 
-### Step 2: Systemd Service
-Create `/etc/systemd/system/ncleweb.service`:
-```ini
-[Unit]
-Description=NCLE Web FastAPI Backend
-After=network.target
+**`GET /api/download/{job_id}`**
 
-[Service]
-Type=simple
-User=www-data
-Group=www-data
-WorkingDirectory=/var/www/ncleweb/py
-Environment="PATH=/var/www/ncleweb/venv/bin"
-ExecStart=/var/www/ncleweb/venv/bin/uvicorn backend:app --host 127.0.0.1 --port 8000
+Download results as CSV file.
+
+---
+
+## Features
+
+### Custom Organism Support
+- Pre-configured organisms: E. coli (cutoff: 57), Human (cutoff: 52), Yeast (cutoff: 49)
+- Custom organism analysis with user-specified clustering cutoffs
+- Dynamic form validation for custom parameters
+
+### Email Notifications
+- Automatic email on job completion
+- Includes job details and direct link to results
+- SMTP configuration via environment variables (.env file)
+
+### Interactive Results Visualization
+- NGL Viewer integration for 3D structure display
+- Support for both all-atom and coarse-grained structures
+- Automatic detection of structure type
+- Multi-chain protein support
+
+### Job Management
+- Browse all submitted jobs
+- Filter by status (pending, processing, completed, failed)
+- Search and pagination
+- Download results as CSV
+
+### Security & Performance
+- Cloudflare DDoS protection and CDN
+- Rate limiting: 10 API requests/minute per IP
+- File upload validation (50MB max, PDB format)
+- Background job processing (non-blocking submissions)
+- SQLite database for job persistence
+
+---
+
+## Environment Configuration
+
+Create a `.env` file in the project root:
+
+```bash
+# SMTP Email Configuration
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_app_password
+FROM_EMAIL=your_email@gmail.com
+```
+
+**Note**: For Gmail, use an [App Password](https://support.google.com/accounts/answer/185833), not your regular password.
+
+---
+
+## Project Structure
+
+```
+NCLEweb/
+├── index.html              # Landing page
+├── submit.html             # Job submission form
+├── browse.html             # Job browser
+├── results.html            # Results viewer with NGL
+├── styles.css              # Global styles
+├── app.js                  # Frontend JavaScript
+├── .env                    # Environment variables (not in git)
+├── requirements.txt        # Python dependencies
+├── start_server.sh         # Backend startup script
+├── py/
+│   ├── backend.py          # FastAPI server
+│   ├── api_wrapper.py      # EntDetect interface
+│   ├── database.py         # SQLite models
+│   ├── email_notifier.py   # Email notifications
+│   └── run_nativeNCLE.py   # Analysis runner
+├── data/
+│   ├── ncle.db             # SQLite database
+│   └── pdb_files/          # Uploaded PDB files (by job_id)
+├── deploy/
+│   ├── HOME_SERVER_SETUP.md    # WSL deployment guide
+│   ├── SERVER_SETUP.md         # Production server guide
+│   ├── CLOUDFLARE_SETUP.md     # Cloudflare configuration
+│   ├── nginx.conf              # Nginx production config
+│   ├── nclweb.service          # Systemd service file
+│   ├── deploy.sh               # Production deployment script
+│   └── deploy_wsl.sh           # WSL deployment script
+└── structure_files/        # Example PDB files
+```
+
+---
+
+## Maintenance
+
+### Monitor Cloudflare Analytics
+- Dashboard: https://dash.cloudflare.com
+- View traffic, threats blocked, bandwidth usage
+- Check Security → Events for blocked attacks
+
+### Database Backups
+```bash
+# Manual backup
+cp data/ncle.db data/ncle.db.backup_$(date +%Y%m%d_%H%M%S)
+
+# Automated backups (add to cron)
+crontab -e
+# Add: 0 2 * * * cp ~/git_repos/NCLEweb/data/ncle.db ~/backups/ncle.db.backup_$(date +\%Y\%m\%d)
+```
+
+### Clean Old Jobs
+```bash
+# Remove job files older than 30 days
+find data/pdb_files/ -type d -mtime +30 -exec rm -rf {} \;
+```
+
+### Disk Usage Monitoring
+```bash
+# Check overall disk space
+df -h
+
+# Check PDB files storage
+du -sh data/pdb_files/
+
+# Check largest job directories
+du -sh data/pdb_files/* | sort -rh | head -10
+```
+
+---
+
+## Troubleshooting
+
+### Site Not Loading
+```bash
+# Check if backend is running
+ps aux | grep gunicorn
+
+# Check if Nginx is running
+sudo service nginx status
+
+# Check logs for errors
+tail -f logs/error.log
+tail -f logs/nginx_error.log
+```
+
+### Backend Won't Start
+```bash
+# Check Python environment
+source venv/bin/activate
+python --version
+
+# Check dependencies
+pip list | grep -E "(fastapi|uvicorn|gunicorn)"
+
+# Check .env file exists
+cat .env
+
+# Check port availability
+lsof -i :8000
+```
+
+### Email Notifications Not Working
+```bash
+# Test email configuration
+python3 -c "
+from dotenv import load_dotenv
+load_dotenv()
+from py.email_notifier import EmailNotifier
+notifier = EmailNotifier()
+print('Enabled:', notifier.enabled)
+print('SMTP Host:', notifier.smtp_host)
+print('SMTP User:', notifier.smtp_user)
+"
+```
+
+### Port Forwarding Issues
+```bash
+# Check Windows port proxy (PowerShell as Admin)
+netsh interface portproxy show v4tov4
+
+# Re-add if missing
+$WSL_IP = (wsl hostname -I).Trim()
+netsh interface portproxy add v4tov4 listenport=80 listenaddress=0.0.0.0 connectport=80 connectaddress=$WSL_IP
+netsh interface portproxy add v4tov4 listenport=443 listenaddress=0.0.0.0 connectport=443 connectaddress=$WSL_IP
+```
+
+---
+
+## Migration to Production Server
+
+When demo is approved, migrate to dedicated hosting:
+
+1. **Set up new server** (DigitalOcean, Linode, etc.)
+2. **Deploy application**: Follow `deploy/SERVER_SETUP.md`
+3. **Migrate database**: Copy `data/ncle.db` to new server
+4. **Update Cloudflare DNS**: Change A record to new server IP
+5. **Test**: Verify site works on new server
+6. **Switch**: DNS propagates automatically (5-30 minutes)
+7. **Clean up**: Stop home server, remove port forwarding
+
+No downtime needed - Cloudflare enables seamless migration!
+
+---
+
+## Credits
+
+- **Backend**: FastAPI, Uvicorn, Gunicorn
+- **Database**: SQLite, SQLAlchemy
+- **Frontend**: NGL Viewer for structure visualization
+- **Infrastructure**: Nginx, Cloudflare
+- **Analysis**: EntDetect Gaussian Entanglement library
+
+---
+
+## License
+
+See LICENSE file for details.
+
 Restart=always
 RestartSec=10
 

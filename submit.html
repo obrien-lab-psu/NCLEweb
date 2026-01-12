@@ -18,12 +18,12 @@
         }
         
         .submit-header h1 {
-            color: #333;
+            color: white;
             margin-bottom: 10px;
         }
         
         .submit-header p {
-            color: #666;
+            color: #e0e0e0;
             font-size: 1.1em;
         }
         
@@ -253,8 +253,9 @@
                             value="Ecoli" 
                             checked
                             style="margin-right: 8px;"
+                            onchange="toggleCustomOrganism()"
                         >
-                        <span>E. coli</span>
+                        <span>E. coli (cutoff: 57)</span>
                     </label>
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input 
@@ -263,8 +264,9 @@
                             name="organism" 
                             value="Human"
                             style="margin-right: 8px;"
+                            onchange="toggleCustomOrganism()"
                         >
-                        <span>Human</span>
+                        <span>Human (cutoff: 52)</span>
                     </label>
                     <label style="display: flex; align-items: center; cursor: pointer;">
                         <input 
@@ -273,11 +275,49 @@
                             name="organism" 
                             value="Yeast"
                             style="margin-right: 8px;"
+                            onchange="toggleCustomOrganism()"
                         >
-                        <span>Yeast</span>
+                        <span>Yeast (cutoff: 49)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="organismCustom" 
+                            name="organism" 
+                            value="Custom"
+                            style="margin-right: 8px;"
+                            onchange="toggleCustomOrganism()"
+                        >
+                        <span>Custom</span>
                     </label>
                 </div>
-                <small>Select the organism for clustering analysis</small>
+                <small>Select the organism for clustering analysis (cutoff values shown for known organisms)</small>
+            </div>
+            
+            <div class="form-group" id="customOrganismFields" style="display: none;">
+                <label>
+                    Custom Organism Name <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="customOrganismName" 
+                    placeholder="e.g., Mouse, Zebrafish, etc."
+                >
+                <small>Enter the organism name for your structure</small>
+            </div>
+            
+            <div class="form-group" id="customCutoffField" style="display: none;">
+                <label>
+                    Custom Clustering Cutoff <span class="required">*</span>
+                </label>
+                <input 
+                    type="number" 
+                    id="customCutoff" 
+                    placeholder="e.g., 50"
+                    min="1"
+                    step="1"
+                >
+                <small>Enter the distance cutoff for clustering (typical range: 45-60)</small>
             </div>
             
             <div class="form-group">
@@ -372,6 +412,16 @@
         const form = document.getElementById('submitForm');
         const submitBtn = document.getElementById('submitBtn');
         const statusMessage = document.getElementById('statusMessage');
+        
+        function toggleCustomOrganism() {
+            const customSelected = document.getElementById('organismCustom').checked;
+            document.getElementById('customOrganismFields').style.display = customSelected ? 'block' : 'none';
+            document.getElementById('customCutoffField').style.display = customSelected ? 'block' : 'none';
+            
+            // Set required attribute based on selection
+            document.getElementById('customOrganismName').required = customSelected;
+            document.getElementById('customCutoff').required = customSelected;
+        }
         
         function showStatus(message, type) {
             statusMessage.textContent = message;
@@ -474,8 +524,33 @@
             formData.append('description', document.getElementById('description').value);
             const structureType = document.querySelector('input[name="structureType"]:checked').value;
             formData.append('structure_type', structureType);
-            const organism = document.querySelector('input[name="organism"]:checked').value;
-            formData.append('organism', organism);
+            
+            // Handle organism and cutoff
+            const organismRadio = document.querySelector('input[name="organism"]:checked').value;
+            if (organismRadio === 'Custom') {
+                const customOrganism = document.getElementById('customOrganismName').value.trim();
+                const customCutoff = document.getElementById('customCutoff').value;
+                
+                if (!customOrganism) {
+                    showStatus('Please enter a custom organism name', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Analysis';
+                    return;
+                }
+                
+                if (!customCutoff || customCutoff < 1) {
+                    showStatus('Please enter a valid clustering cutoff (minimum 1)', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Analysis';
+                    return;
+                }
+                
+                formData.append('organism', customOrganism);
+                formData.append('cluster_cutoff', customCutoff);
+            } else {
+                formData.append('organism', organismRadio);
+            }
+            
             formData.append('coarse_grained', isCaCG);
             formData.append('ca_contact', useCaContact);
             formData.append('file', pdbFile);

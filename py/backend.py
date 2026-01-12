@@ -247,7 +247,7 @@ def validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
-async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False):
+async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False, cluster_cutoff: Optional[int] = None):
     """Background task to process job
     
     Parameters
@@ -261,18 +261,20 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
     structure_type : str
         Structure type: "EXP" for experimental or "AF" for AlphaFold
     organism : str
-        Organism for clustering: "Ecoli", "Human", or "Yeast"
+        Organism for clustering: "Ecoli", "Human", "Yeast", or custom name
     coarse_grained : bool
         Whether the structure is coarse-grained (C-alpha only) - sets CG parameter
     ca_contact : bool
         Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter
+    cluster_cutoff : int, optional
+        Custom clustering cutoff (only for non-standard organisms)
     """
     try:
         # Update status to processing
         db.update_job_status(job_id, 'processing')
         
         # Run analysis (don't cleanup yet - we need to save the PDB file)
-        result = calculate_native_ge(temp_pdb_path, cleanup=False, structure_type=structure_type, organism=organism, coarse_grained=coarse_grained, ca_contact=ca_contact)
+        result = calculate_native_ge(temp_pdb_path, cleanup=False, structure_type=structure_type, organism=organism, coarse_grained=coarse_grained, ca_contact=ca_contact, cluster_cutoff=cluster_cutoff)
         
         if not result['success']:
             # Job failed - cleanup temp file
@@ -347,6 +349,7 @@ async def submit_job(
     description: Optional[str] = Form(None),
     structure_type: str = Form("EXP"),
     organism: str = Form("Ecoli"),
+    cluster_cutoff: Optional[int] = Form(None),
     coarse_grained: bool = Form(False),
     ca_contact: bool = Form(False),
     file: UploadFile = File(...)
@@ -367,7 +370,9 @@ async def submit_job(
     structure_type : str
         Structure type: "EXP" or "AF"
     organism : str
-        Organism for clustering: "Ecoli", "Human", or "Yeast"
+        Organism for clustering: "Ecoli", "Human", "Yeast", or custom name
+    cluster_cutoff : int, optional
+        Custom clustering cutoff (only for non-standard organisms)
     coarse_grained : bool
         Whether the structure is coarse-grained (C-alpha only) - sets CG parameter
     ca_contact : bool
@@ -380,6 +385,14 @@ async def submit_job(
     JSONResponse
         Job ID and status
     """
+    
+    # Validate inputs
+    if not validate_email(email):
+        raise HTTPException(status_code=400, detail="Invalid email address")
+    
+    if not job_name or len(job_name.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Job name is required")
+    
     
     # Validate inputs
     if not validate_email(email):
@@ -420,7 +433,7 @@ async def submit_job(
     base_url = os.getenv('BASE_URL', 'http://localhost:8000')
     
     # Add background task to process the job
-    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact)
+    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact, cluster_cutoff)
     
     return JSONResponse(content={
         'success': True,

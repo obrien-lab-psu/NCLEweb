@@ -47,7 +47,7 @@ def get_chains(pdb_path):
         return ['']  # Return single empty chain on error
 
 
-def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False):
+def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None):
     """
     Calculate native Gaussian entanglement for a PDB file.
     Runs Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE analyses.
@@ -61,11 +61,13 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
     structure_type : str, optional
         Structure type: "EXP" for experimental or "AF" for AlphaFold, by default "EXP"
     organism : str, optional
-        Organism for clustering: "Ecoli", "Human", or "Yeast", by default "Ecoli"
+        Organism for clustering: "Ecoli", "Human", "Yeast", or custom name, by default "Ecoli"
     coarse_grained : bool, optional
         Whether the structure is coarse-grained (C-alpha only) - sets CG parameter, by default False
     ca_contact : bool, optional
         Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter, by default False
+    cluster_cutoff : int, optional
+        Custom clustering cutoff (only for non-standard organisms), by default None
         
     Returns
     -------
@@ -191,7 +193,11 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                 if CLUSTERING_AVAILABLE and len(hq_df) > 0:
                     print(f"Clustering high-quality entanglements with organism={organism}...")
                     try:
-                        clustering = ClusterNativeEntanglements(organism=organism)
+                        # Use cluster_cutoff if provided, otherwise use organism default
+                        if cluster_cutoff is not None:
+                            clustering = ClusterNativeEntanglements(organism=organism, cut_off=cluster_cutoff)
+                        else:
+                            clustering = ClusterNativeEntanglements(organism=organism)
                         clustered_temp_dir = os.path.join(chain_temp_dir, 'Clustered')
                         os.makedirs(clustered_temp_dir, exist_ok=True)
                         

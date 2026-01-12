@@ -6,7 +6,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #0f1e36 0%, #1e3a5f 100%);
     min-height: 100vh;
     padding: 10px;
 }
@@ -26,7 +26,7 @@ body {
 
 /* Header */
 header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2c5f8d 0%, #3a7bb5 100%);
     color: white;
     padding: 40px 30px;
     text-align: center;
@@ -63,14 +63,14 @@ header .btn-secondary {
 }
 
 .btn-primary {
-    background: #667eea;
+    background: #2c5f8d;
     color: white;
 }
 
 .btn-primary:hover {
-    background: #5568d3;
+    background: #3a7bb5;
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    box-shadow: 0 4px 12px rgba(44, 95, 141, 0.4);
 }
 
 .btn-success {
@@ -86,7 +86,7 @@ header .btn-secondary {
 
 .btn-secondary {
     background: white;
-    color: #667eea;
+    color: #2c5f8d;
     border: 2px solid white;
 }
 
@@ -127,13 +127,13 @@ header .btn-secondary {
 }
 
 .upload-box:hover {
-    border-color: #667eea;
-    background: #f0f4ff;
+    border-color: #2c5f8d;
+    background: #f0f5fa;
 }
 
 .upload-box.dragover {
-    border-color: #667eea;
-    background: #e0e7ff;
+    border-color: #2c5f8d;
+    background: #e3eef7;
 }
 
 .upload-icon {
@@ -156,8 +156,8 @@ header .btn-secondary {
 .file-name {
     margin-top: 15px;
     padding: 12px 20px;
-    background: #e0e7ff;
-    color: #4338ca;
+    background: #e3eef7;
+    color: #1e3a5f;
     border-radius: 8px;
     font-weight: 500;
     display: none;
@@ -211,7 +211,7 @@ header .btn-secondary {
     height: 80px;
     margin: 0 auto 30px;
     border: 6px solid #e2e8f0;
-    border-top-color: #667eea;
+    border-top-color: #2c5f8d;
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -244,7 +244,7 @@ header .btn-secondary {
 
 .progress-fill {
     height: 100%;
-    background: linear-gradient(90deg, #667eea, #764ba2);
+    background: linear-gradient(90deg, #1e3a5f, #2c5f8d);
     animation: progress 2s ease-in-out infinite;
 }
 
@@ -287,7 +287,7 @@ header .btn-secondary {
 
 .stat-card {
     flex: 1;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2c5f8d 0%, #3a7bb5 100%);
     color: white;
     padding: 30px;
     border-radius: 12px;
@@ -374,13 +374,13 @@ header .btn-secondary {
 }
 
 .chain-select:hover:not(:disabled) {
-    border-color: #667eea;
+    border-color: #2c5f8d;
 }
 
 .chain-select:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #2c5f8d;
+    box-shadow: 0 0 0 3px rgba(44, 95, 141, 0.1);
 }
 
 .chain-select:disabled {
@@ -435,15 +435,15 @@ header .btn-secondary {
 }
 
 .tabulator-row:hover {
-    background: #f0f4ff !important;
+    background: #f0f5fa !important;
 }
 
 .tabulator-row.tabulator-selected {
-    background: #dce4ff !important;
+    background: #d6e4f0 !important;
 }
 
 .tabulator-row.tabulator-selected:hover {
-    background: #cdd9ff !important;
+    background: #c7dbe8 !important;
 }
 
 .tabulator-footer {

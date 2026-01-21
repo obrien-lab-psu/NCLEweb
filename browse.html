@@ -213,6 +213,21 @@
                     height: "600px",
                     columns: [
                         {
+                            title: "Actions", 
+                            field: "job_id",
+                            width: 120,
+                            hozAlign: "center",
+                            formatter: (cell) => {
+                                const jobId = cell.getValue();
+                                const status = cell.getRow().getData().status;
+                                if (status === 'completed') {
+                                    return `<button class="btn btn-primary btn-sm" onclick="viewResults('${jobId}')">View</button>`;
+                                } else {
+                                    return '-';
+                                }
+                            }
+                        },
+                        {
                             title: "Job Name", 
                             field: "job_name", 
                             width: 200,
@@ -269,21 +284,6 @@
                             field: "description", 
                             width: 200,
                             headerFilter: "input"
-                        },
-                        {
-                            title: "Actions", 
-                            field: "job_id",
-                            width: 120,
-                            hozAlign: "center",
-                            formatter: (cell) => {
-                                const jobId = cell.getValue();
-                                const status = cell.getRow().getData().status;
-                                if (status === 'completed') {
-                                    return `<button class="btn btn-primary btn-sm" onclick="viewResults('${jobId}')">View</button>`;
-                                } else {
-                                    return '-';
-                                }
-                            }
                         }
                     ],
                     initialSort: [

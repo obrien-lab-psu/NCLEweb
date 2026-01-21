@@ -13,6 +13,9 @@ from EntDetect.gaussian_entanglement import GaussianEntanglement
 import pandas as pd
 import MDAnalysis as mda
 
+# Import PDB preprocessor
+from pdb_preprocessor import preprocess_pdb
+
 # Try to import clustering - it may not be available in all environments
 try:
     from EntDetect.clustering import ClusterNativeEntanglements
@@ -82,6 +85,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         - 'clustered_csv': str with CSV-formatted clustered results (if success=True)
         - 'error': str with error message (if success=False)
         - 'pdb_id': str identifier from filename
+        - 'warnings': list of preprocessing warnings
     """
     result = {
         'success': False,
@@ -92,16 +96,57 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         'clustered_data': None,
         'clustered_csv': None,
         'error': None,
-        'pdb_id': None
+        'pdb_id': None,
+        'warnings': []
     }
     
     # Extract PDB ID from filename
     pdb_id = Path(pdb_path).stem
     result['pdb_id'] = pdb_id
     
-    # Detect chains in the structure
-    chains = get_chains(pdb_path)
-    print(f"Detected {len(chains)} chain(s): {chains}")
+    # Verify input file exists
+    if not os.path.exists(pdb_path):
+        result['error'] = f"PDB file not found: {pdb_path}"
+        return result
+    
+    # Preprocess PDB: Filter chains with < 10 residues
+    print(f"\n{'='*60}")
+    print(f"Preprocessing PDB file: {pdb_path}")
+    print(f"{'='*60}")
+    
+    # Create a filtered PDB for analysis (keeps original for visualization)
+    filtered_pdb_path = pdb_path.replace('.pdb', '_filtered.pdb')
+    
+    preprocess_result = preprocess_pdb(
+        pdb_path=pdb_path,
+        is_coarse_grained=coarse_grained,
+        output_path=filtered_pdb_path,  # Write to separate file
+        min_residues=10
+    )
+    
+    if not preprocess_result['success']:
+        result['error'] = preprocess_result['error']
+        result['warnings'] = preprocess_result.get('warnings', [])
+        return result
+    
+    # Store preprocessing warnings and chain info
+    result['warnings'] = preprocess_result.get('warnings', [])
+    result['skipped_chains'] = preprocess_result.get('skipped_chains', [])
+    result['valid_chains'] = preprocess_result.get('valid_chains', [])
+    
+    if preprocess_result.get('skipped_chains'):
+        print(f"\n⚠ Skipped chains with < 10 residues: {', '.join(preprocess_result['skipped_chains'])}")
+        print(f"   These chains will be visible in structure viewer but not analyzed.")
+    
+    print(f"✓ Valid chains for analysis: {', '.join(preprocess_result['valid_chains'])}")
+    print(f"✓ Total residues to analyze: {preprocess_result['total_residues_kept']}")
+    
+    # Use filtered PDB for analysis
+    analysis_pdb = filtered_pdb_path
+    
+    # Detect chains in the filtered structure
+    chains = get_chains(analysis_pdb)
+    print(f"Detected {len(chains)} chain(s) in filtered PDB: {chains}")
     
     # Create temporary directory for output
     temp_dir = tempfile.mkdtemp(prefix=f'ge_analysis_{pdb_id}_')
@@ -111,17 +156,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
     all_hq_dfs = []
     all_clustered_dfs = []
     
-    # Store results from all chains
-    all_native_dfs = []
-    all_hq_dfs = []
-    all_clustered_dfs = []
-    
     try:
-        # Verify input file exists
-        if not os.path.exists(pdb_path):
-            result['error'] = f"PDB file not found: {pdb_path}"
-            return result
-        
         # Process each chain
         for chain in chains:
             # Use chain-specific ID if multiple chains
@@ -154,7 +189,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
             # Calculate native entanglements (Step 1: Native_GE)
             print(f"Analyzing {chain_id}...")
             native_ent = ge.calculate_native_entanglements(
-                pdb_file=pdb_path,
+                pdb_file=analysis_pdb,  # Use filtered PDB for analysis
                 outdir=chain_temp_dir,
                 ID=chain_id,
                 chain=chain if chain else None
@@ -274,6 +309,11 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         if cleanup and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
             print(f"Cleaned up temporary directory: {temp_dir}")
+        
+        # Clean up filtered PDB file
+        if cleanup and 'filtered_pdb_path' in locals() and os.path.exists(filtered_pdb_path):
+            os.remove(filtered_pdb_path)
+            print(f"Cleaned up filtered PDB: {filtered_pdb_path}")
     
     return result
 

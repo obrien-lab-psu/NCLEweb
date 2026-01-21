@@ -189,6 +189,12 @@
                     </div>
                 </div>
                 
+                <!-- Skipped Chains Warning -->
+                <div id="skippedChainsWarning" style="display: none; background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                    <h3 style="margin: 0 0 8px 0; color: #856404; font-size: 1.1rem;">⚠ Quality Check Warning</h3>
+                    <p id="skippedChainsMessage" style="margin: 0; color: #856404;"></p>
+                </div>
+                
                 <div id="resultsStats" class="stats-row">
                     <!-- Stats will be inserted here -->
                 </div>
@@ -396,9 +402,21 @@
             
             document.getElementById('resultsSection').style.display = 'block';
             
+            // Display skipped chains warning if any
+            if (data.skipped_chains && data.skipped_chains.length > 0) {
+                const warningDiv = document.getElementById('skippedChainsWarning');
+                const messageEl = document.getElementById('skippedChainsMessage');
+                warningDiv.style.display = 'block';
+                
+                const chainList = data.skipped_chains.join(', ');
+                messageEl.innerHTML = `The following chain(s) were excluded from analysis due to insufficient residues (< 10): <strong>${chainList}</strong>.<br>These chains are still visible in the structure viewer above, but no entanglement data is available for them.`;
+            }
+            
+            document.getElementById('resultsSection').style.display = 'block';
+            
             // Update title
             document.getElementById('resultsTitle').textContent = 
-                `Entanglement Results - ${data.pdb_id || 'Structure'}`;
+                `Entanglement Results - ${data.job_name || 'Structure'}`;
             
             // Display stats
             const results = data.results || [];
@@ -465,7 +483,7 @@
             }
             
             // Setup download CSV button
-            document.getElementById('downloadCSV').onclick = () => downloadCSV(results, data.pdb_id);
+            document.getElementById('downloadCSV').onclick = () => downloadCSV(results, data.job_name);
         }
 
         // Show processing message
@@ -487,7 +505,17 @@
             document.getElementById('jobInfoSection').style.display = 'none';
             document.getElementById('resultsSection').style.display = 'none';
             document.getElementById('errorState').style.display = 'block';
-            document.getElementById('errorMessage').textContent = message;
+            
+            // Strip ANSI escape codes from error message
+            let cleanMessage = message.replace(/\x1b\[[0-9;]*m/g, '');
+            
+            // Filter out EntDetect chain skipping warnings (already handled by our preprocessor)
+            cleanMessage = cleanMessage.split('\n')
+                .filter(line => !line.includes('Skipping over chain') && !line.includes('since chain has only'))
+                .join('\n')
+                .trim();
+            
+            document.getElementById('errorMessage').textContent = cleanMessage;
         }
 
         // Render Tabulator table
@@ -820,10 +848,20 @@
             });
             
             const uniqueChains = [...new Set(chains)];
+            const skippedChains = currentJobData?.skipped_chains || [];
+            
             uniqueChains.forEach(chain => {
                 const option = document.createElement('option');
                 option.value = chain;
-                option.textContent = `Chain ${chain}`;
+                
+                // Mark skipped chains with warning
+                if (skippedChains.includes(chain)) {
+                    option.textContent = `Chain ${chain} ⚠ (Not analyzed - < 10 residues)`;
+                    option.style.color = '#856404';
+                    option.style.fontWeight = 'bold';
+                } else {
+                    option.textContent = `Chain ${chain}`;
+                }
                 chainSelect.appendChild(option);
             });
             

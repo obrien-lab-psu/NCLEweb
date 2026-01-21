@@ -22,7 +22,7 @@
         }
         
         .browse-header h1 {
-            color: #333;
+            color: #f0f0f0;
         }
         
         .header-actions {
@@ -229,12 +229,6 @@
                             }
                         },
                         {
-                            title: "PDB ID", 
-                            field: "pdb_id", 
-                            width: 100,
-                            headerFilter: "input"
-                        },
-                        {
                             title: "Uniprot ID", 
                             field: "uniprot_id", 
                             width: 120,
@@ -249,6 +243,18 @@
                             title: "Entanglements", 
                             field: "num_entanglements", 
                             width: 130,
+                            hozAlign: "center"
+                        },
+                        {
+                            title: "HQ Entanglements", 
+                            field: "num_hq_entanglements", 
+                            width: 150,
+                            hozAlign: "center"
+                        },
+                        {
+                            title: "Clustered", 
+                            field: "num_clustered_entanglements", 
+                            width: 110,
                             hozAlign: "center"
                         },
                         {

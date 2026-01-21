@@ -14,6 +14,7 @@ import os
 import shutil
 import sys
 import re
+import requests
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
@@ -56,6 +57,57 @@ def split_combined_crossings(hq_results: list) -> list:
         processed_results.append(result_copy)
     
     return processed_results
+
+
+def fetch_pdb_from_rcsb(pdb_id: str, output_path: str) -> bool:
+    """
+    Download a PDB file from RCSB database
+    
+    Parameters
+    ----------
+    pdb_id : str
+        4-character PDB ID (e.g., '1PKL')
+    output_path : str
+        Path where the PDB file should be saved
+        
+    Returns
+    -------
+    bool
+        True if download successful, False otherwise
+    """
+    # Ensure PDB ID is uppercase and 4 characters
+    pdb_id = pdb_id.strip().upper()
+    
+    if len(pdb_id) != 4:
+        raise ValueError(f"Invalid PDB ID: {pdb_id}. Must be 4 characters.")
+    
+    # RCSB download URL
+    url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+    
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        # Check if we got a valid PDB file (should start with HEADER, TITLE, or ATOM)
+        content = response.text
+        if not any(content.startswith(keyword) for keyword in ['HEADER', 'TITLE', 'ATOM', 'MODEL']):
+            raise ValueError(f"Downloaded file for {pdb_id} does not appear to be a valid PDB file")
+        
+        # Save to file
+        with open(output_path, 'w') as f:
+            f.write(content)
+        
+        return True
+        
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"PDB ID {pdb_id} not found in RCSB database")
+        else:
+            raise HTTPException(status_code=502, detail=f"Error fetching PDB from RCSB: {str(e)}")
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Network error fetching PDB: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDB file: {str(e)}")
 
 
 # Initialize FastAPI app
@@ -314,9 +366,9 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
         db.save_results(
             job_id, 
             result['data'], 
-            pdb_id=result['pdb_id'],
             hq_results_df=result.get('hq_data'),
-            clustered_results_df=result.get('clustered_data')
+            clustered_results_df=result.get('clustered_data'),
+            skipped_chains=result.get('skipped_chains', [])
         )
         db.update_job_status(job_id, 'completed')
         
@@ -357,7 +409,9 @@ async def submit_job(
     cluster_cutoff: Optional[int] = Form(None),
     coarse_grained: bool = Form(False),
     ca_contact: bool = Form(False),
-    file: UploadFile = File(...)
+    input_type: str = Form("file"),
+    rcsb_pdb_id: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None)
 ):
     """
     Submit a new analysis job with user metadata
@@ -382,8 +436,12 @@ async def submit_job(
         Whether the structure is coarse-grained (C-alpha only) - sets CG parameter
     ca_contact : bool
         Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter
-    file : UploadFile
-        PDB file to analyze
+    input_type : str
+        Type of input: "file" or "pdb_id"
+    rcsb_pdb_id : str, optional
+        RCSB PDB ID to fetch (if input_type is "pdb_id")
+    file : UploadFile, optional
+        PDB file to analyze (if input_type is "file")
         
     Returns
     -------
@@ -398,41 +456,84 @@ async def submit_job(
     if not job_name or len(job_name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Job name is required")
     
-    
-    # Validate inputs
-    if not validate_email(email):
-        raise HTTPException(status_code=400, detail="Invalid email address")
-    
-    if not job_name or len(job_name.strip()) == 0:
-        raise HTTPException(status_code=400, detail="Job name is required")
-    
-    if not file.filename.endswith('.pdb'):
-        raise HTTPException(status_code=400, detail="Only PDB files are accepted")
-    
-    # Validate file size
-    MAX_SIZE = 20 * 1024 * 1024
-    contents = await file.read()
-    if len(contents) > MAX_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large. Maximum size is 20 MB"
+    # Handle PDB ID input type
+    if input_type == "pdb_id":
+        if not rcsb_pdb_id:
+            raise HTTPException(status_code=400, detail="PDB ID is required when input_type is pdb_id")
+        
+        # Normalize PDB ID
+        rcsb_pdb_id = rcsb_pdb_id.strip().upper()
+        
+        if len(rcsb_pdb_id) != 4:
+            raise HTTPException(status_code=400, detail="PDB ID must be exactly 4 characters")
+        
+        # Check if this PDB ID has already been analyzed
+        existing_job = db.get_job_by_rcsb_pdb_id(rcsb_pdb_id)
+        if existing_job:
+            return JSONResponse(content={
+                'success': True,
+                'job_id': existing_job.job_id,
+                'message': f'PDB {rcsb_pdb_id} has already been analyzed. Returning existing results.',
+                'is_cached': True
+            })
+        
+        # Create job in database with RCSB PDB ID
+        job_id = db.create_job(
+            email=email.strip(),
+            job_name=job_name.strip(),
+            pdb_filename=f"{rcsb_pdb_id}.pdb",
+            uniprot_id=uniprot_id.strip() if uniprot_id else None,
+            description=description.strip() if description else None,
+            coarse_grained=coarse_grained,
+            ca_contact=ca_contact,
+            rcsb_pdb_id=rcsb_pdb_id
         )
+        
+        # Download PDB file from RCSB
+        temp_pdb = tempfile.NamedTemporaryFile(mode='w', suffix='.pdb', delete=False)
+        temp_pdb.close()
+        
+        try:
+            fetch_pdb_from_rcsb(rcsb_pdb_id, temp_pdb.name)
+        except HTTPException as e:
+            # Clean up and delete the job if download fails
+            db.update_job_status(job_id, 'failed', error_message=str(e.detail))
+            os.unlink(temp_pdb.name)
+            raise
     
-    # Create job in database
-    job_id = db.create_job(
-        email=email.strip(),
-        job_name=job_name.strip(),
-        pdb_filename=file.filename,
-        uniprot_id=uniprot_id.strip() if uniprot_id else None,
-        description=description.strip() if description else None,
-        coarse_grained=coarse_grained,
-        ca_contact=ca_contact
-    )
-    
-    # Save PDB file temporarily
-    temp_pdb = tempfile.NamedTemporaryFile(mode='wb', suffix='.pdb', delete=False)
-    temp_pdb.write(contents)
-    temp_pdb.close()
+    # Handle file upload input type
+    else:
+        if not file:
+            raise HTTPException(status_code=400, detail="PDB file is required when input_type is file")
+        
+        if not file.filename.endswith('.pdb'):
+            raise HTTPException(status_code=400, detail="Only PDB files are accepted")
+        
+        # Validate file size
+        MAX_SIZE = 20 * 1024 * 1024
+        contents = await file.read()
+        if len(contents) > MAX_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is 20 MB"
+            )
+        
+        # Create job in database
+        job_id = db.create_job(
+            email=email.strip(),
+            job_name=job_name.strip(),
+            pdb_filename=file.filename,
+            uniprot_id=uniprot_id.strip() if uniprot_id else None,
+            description=description.strip() if description else None,
+            coarse_grained=coarse_grained,
+            ca_contact=ca_contact,
+            rcsb_pdb_id=None
+        )
+        
+        # Save PDB file temporarily
+        temp_pdb = tempfile.NamedTemporaryFile(mode='wb', suffix='.pdb', delete=False)
+        temp_pdb.write(contents)
+        temp_pdb.close()
     
     # Get base URL for email links
     base_url = os.getenv('BASE_URL', 'http://localhost:8000')
@@ -518,7 +619,6 @@ async def get_job_details(job_id: str):
         
         return JSONResponse(content={
             'success': True,
-            'pdb_id': job_data['job']['pdb_id'],
             'job_name': job_data['job']['job_name'],
             'uniprot_id': job_data['job']['uniprot_id'],
             'description': job_data['job']['description'],
@@ -526,6 +626,8 @@ async def get_job_details(job_id: str):
             'completed_at': job_data['job']['completion_timestamp'],
             'status': job_data['job']['status'],
             'num_entanglements': job_data['job']['num_entanglements'],
+            'num_hq_entanglements': job_data['job']['num_hq_entanglements'],
+            'num_clustered_entanglements': job_data['job']['num_clustered_entanglements'],
             'num_chains': job_data['job']['num_chains'],
             'coarse_grained': job_data['job']['coarse_grained'],
             'ca_contact': job_data['job']['ca_contact'],

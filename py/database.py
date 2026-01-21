@@ -26,15 +26,18 @@ class Job(Base):
     uniprot_id = Column(String, nullable=True)
     description = Column(Text, nullable=True)
     pdb_filename = Column(String, nullable=False)
-    pdb_id = Column(String, nullable=True)  # Extracted from file or analysis
+    rcsb_pdb_id = Column(String, nullable=True, index=True)
     upload_timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
     completion_timestamp = Column(DateTime, nullable=True)
     status = Column(String, nullable=False, default='pending')  # pending, processing, completed, failed
     error_message = Column(Text, nullable=True)
     num_entanglements = Column(Integer, nullable=True)
+    num_hq_entanglements = Column(Integer, nullable=True)
+    num_clustered_entanglements = Column(Integer, nullable=True)
     num_chains = Column(Integer, nullable=True)
     coarse_grained = Column(Boolean, nullable=False, default=False)
     ca_contact = Column(Boolean, nullable=False, default=False)
+    skipped_chains = Column(Text, nullable=True)  # JSON array of chains that failed QC
     
     # Relationship to results
     results = relationship("Result", back_populates="job", cascade="all, delete-orphan")
@@ -50,15 +53,18 @@ class Job(Base):
             'uniprot_id': self.uniprot_id,
             'description': self.description,
             'pdb_filename': self.pdb_filename,
-            'pdb_id': self.pdb_id,
+            'rcsb_pdb_id': self.rcsb_pdb_id,
             'upload_timestamp': self.upload_timestamp.isoformat() if self.upload_timestamp else None,
             'completion_timestamp': self.completion_timestamp.isoformat() if self.completion_timestamp else None,
             'status': self.status,
             'error_message': self.error_message,
             'num_entanglements': self.num_entanglements,
+            'num_hq_entanglements': self.num_hq_entanglements,
+            'num_clustered_entanglements': self.num_clustered_entanglements,
             'num_chains': self.num_chains,
             'coarse_grained': self.coarse_grained,
-            'ca_contact': self.ca_contact
+            'ca_contact': self.ca_contact,
+            'skipped_chains': json.loads(self.skipped_chains) if self.skipped_chains else []
         }
         if include_email:
             data['email'] = self.email
@@ -229,7 +235,7 @@ class Database:
         """Get a new database session"""
         return self.Session()
     
-    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False):
+    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False, rcsb_pdb_id=None):
         """Create a new job entry"""
         session = self.get_session()
         try:
@@ -242,7 +248,8 @@ class Database:
                 description=description,
                 status='pending',
                 coarse_grained=coarse_grained,
-                ca_contact=ca_contact
+                ca_contact=ca_contact,
+                rcsb_pdb_id=rcsb_pdb_id
             )
             session.add(job)
             session.commit()
@@ -257,6 +264,18 @@ class Database:
         session = self.get_session()
         try:
             return session.query(Job).filter_by(job_id=job_id).first()
+        finally:
+            session.close()
+    
+    def get_job_by_rcsb_pdb_id(self, rcsb_pdb_id):
+        """Get a completed job by RCSB PDB ID"""
+        session = self.get_session()
+        try:
+            # Return the most recent completed job for this PDB ID
+            return session.query(Job).filter_by(
+                rcsb_pdb_id=rcsb_pdb_id.upper(),
+                status='completed'
+            ).order_by(Job.completion_timestamp.desc()).first()
         finally:
             session.close()
     
@@ -276,7 +295,7 @@ class Database:
         finally:
             session.close()
     
-    def save_results(self, job_id, results_df, pdb_id=None, hq_results_df=None, clustered_results_df=None):
+    def save_results(self, job_id, results_df, hq_results_df=None, clustered_results_df=None, skipped_chains=None):
         """Save analysis results for a job (Native_GE, Native_HQ_GE, and optionally Native_clustered_HQ_GE)"""
         session = self.get_session()
         try:
@@ -285,8 +304,13 @@ class Database:
             if not job:
                 raise ValueError(f"Job {job_id} not found")
             
-            job.pdb_id = pdb_id
             job.num_entanglements = len(results_df)
+            job.num_hq_entanglements = len(hq_results_df) if hq_results_df is not None else None
+            job.num_clustered_entanglements = len(clustered_results_df) if clustered_results_df is not None else None
+            
+            # Store skipped chains as JSON
+            if skipped_chains:
+                job.skipped_chains = json.dumps(skipped_chains)
             
             # Extract unique chains from the dataframe
             # EntDetect doesn't have a 'chain' column, so we need to extract it from residue ranges

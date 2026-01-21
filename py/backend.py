@@ -62,6 +62,7 @@ def split_combined_crossings(hq_results: list) -> list:
 def fetch_pdb_from_rcsb(pdb_id: str, output_path: str) -> bool:
     """
     Download a PDB file from RCSB database
+    Tries PDB format first, falls back to CIF format for newer structures
     
     Parameters
     ----------
@@ -76,16 +77,89 @@ def fetch_pdb_from_rcsb(pdb_id: str, output_path: str) -> bool:
         True if download successful, False otherwise
     """
     # Ensure PDB ID is uppercase and 4 characters
-    pdb_id = pdb_id.strip().upper()
+    pdb_id_upper = pdb_id.strip().upper()
+    pdb_id_lower = pdb_id.strip().lower()
     
-    if len(pdb_id) != 4:
+    if len(pdb_id_upper) != 4:
         raise ValueError(f"Invalid PDB ID: {pdb_id}. Must be 4 characters.")
     
-    # RCSB download URL
-    url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+    # Try PDB format first
+    pdb_url = f"https://files.rcsb.org/download/{pdb_id_upper}.pdb"
     
     try:
-        response = requests.get(url, timeout=30)
+        response = requests.get(pdb_url, timeout=30)
+        
+        if response.status_code == 200:
+            # PDB format available
+            content = response.text
+            if not any(content.startswith(keyword) for keyword in ['HEADER', 'TITLE', 'ATOM', 'MODEL']):
+                raise ValueError(f"Downloaded file for {pdb_id} does not appear to be a valid PDB file")
+            
+            with open(output_path, 'w') as f:
+                f.write(content)
+            return True
+            
+        elif response.status_code == 404:
+            # PDB format not available, try CIF format (newer structures)
+            print(f"PDB format not available for {pdb_id_upper}, trying CIF format...")
+            cif_url = f"https://files.rcsb.org/download/{pdb_id_lower}.cif"
+            
+            cif_response = requests.get(cif_url, timeout=30)
+            
+            if cif_response.status_code == 200:
+                # Convert CIF to PDB using BioPython
+                try:
+                    from Bio.PDB import MMCIFParser, PDBIO
+                    import tempfile
+                    
+                    # Save CIF to temp file
+                    with tempfile.NamedTemporaryFile(mode='w', suffix='.cif', delete=False) as tmp_cif:
+                        tmp_cif.write(cif_response.text)
+                        tmp_cif_path = tmp_cif.name
+                    
+                    try:
+                        # Parse CIF and write as PDB
+                        parser = MMCIFParser(QUIET=True)
+                        structure = parser.get_structure(pdb_id_upper, tmp_cif_path)
+                        
+                        io = PDBIO()
+                        io.set_structure(structure)
+                        io.save(output_path)
+                        
+                        print(f"Successfully converted CIF to PDB format for {pdb_id_upper}")
+                        return True
+                    finally:
+                        # Clean up temp CIF file
+                        os.unlink(tmp_cif_path)
+                        
+                except ImportError:
+                    raise HTTPException(
+                        status_code=500, 
+                        detail=f"PDB ID {pdb_id_upper} only available in CIF format, but BioPython not installed for conversion"
+                    )
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Error converting CIF to PDB for {pdb_id_upper}: {str(e)}"
+                    )
+            else:
+                # Neither PDB nor CIF format available
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"PDB ID {pdb_id_upper} not found in RCSB database (tried both PDB and CIF formats)"
+                )
+        else:
+            raise HTTPException(
+                status_code=502, 
+                detail=f"Error fetching PDB from RCSB: HTTP {response.status_code}"
+            )
+            
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(status_code=502, detail=f"Network error fetching PDB: {str(e)}")
+    except HTTPException:
+        raise  # Re-raise HTTPExceptions as-is
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing PDB file: {str(e)}")
         response.raise_for_status()
         
         # Check if we got a valid PDB file (should start with HEADER, TITLE, or ATOM)

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 from EntDetect.gaussian_entanglement import GaussianEntanglement
 from EntDetect.clustering import ClusterNativeEntanglements
-# from EntDetect.entanglement_features import FeatureGen
 
 """
 python scripts/run_nativeNCLE.py 
@@ -28,22 +27,24 @@ if __name__ == "__main__":
     parser.add_argument("--ID", type=str, required=False, help="An id for the analysis (defaults to structure basename)")
     parser.add_argument("--chain", type=str, required=False, help="Chain identifier (optional, processes all chains if not specified)", default=None)
     parser.add_argument("--organism", type=str, required=False, help="Organism name for clustering: {Ecoli, Human, Yeast}", default='Ecoli')
-    parser.add_argument("--Accession", type=str, required=False, help="UniProt Accession for the protein", default='P00558')
     parser.add_argument("--cg", action='store_true', help="Indicate structure is coarse-grained (C-alpha only) model")
-    parser.add_argument("--CaContact", action='store_true', help="Indicate whether to use C-alpha contacts for feature generation (if not set, uses heavy atom contacts)")
+    parser.add_argument("--Calpha", action='store_true', help="Indicate structure is coarse-grained (C-alpha only) model")
+    parser.add_argument("--cluster_cutoff", type=float, required=False, help="Clustering cutoff distance (default: 5.0)", default=52.0)
+    parser.add_argument("--model", type=str, required=False, help="Model type for high-quality selection: {EXP, AF}", default='EXP')
     args = parser.parse_args()
     print(args)
     
     struct = args.struct
     outdir = args.outdir
+    os.makedirs(outdir, exist_ok=True)
     ID = args.ID if args.ID is not None else os.path.splitext(os.path.basename(struct))[0]
     chain = args.chain
     organism = args.organism
-    cg = args.cg
-    CaContact = args.CaContact
+    cluster_cutoff = args.cluster_cutoff
+    model = args.model
     # Set up Gaussian Entanglement and Clustering objects
-    ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=CaContact, CG=cg)
-    clustering = ClusterNativeEntanglements(organism=organism)
+    ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=args.Calpha, CG=args.cg)
+    clustering = ClusterNativeEntanglements(organism=organism, cut_off=cluster_cutoff)
 
     # Determine which chains to process
     if chain is not None:
@@ -74,23 +75,19 @@ if __name__ == "__main__":
         
         # All chains use the same Native_GE directory
         ge_outdir = os.path.join(outdir, 'Native_GE')
+        os.makedirs(ge_outdir, exist_ok=True)
         
         # Calculate native entanglements for this chain
         NativeEnt = ge.calculate_native_entanglements(struct, outdir=ge_outdir, ID=hq_id, chain=chain_id)
         print(f'Native entanglements saved to {NativeEnt["outfile"]}')
         
         # Optional steps: select high-quality entanglements 
-        HQNativeEnt = ge.select_high_quality_entanglements(NativeEnt['outfile'], struct, outdir=os.path.join(outdir, "Native_HQ_GE"), ID=hq_id, model="EXP", chain=chain_id)
+        HQNativeEnt = ge.select_high_quality_entanglements(NativeEnt['outfile'], struct, outdir=os.path.join(outdir, "Native_HQ_GE"), ID=hq_id, model=model, chain=chain_id)
         print(f'High-quality native entanglements saved to {HQNativeEnt["outfile"]}')
 
         # Cluster the native entanglements to remove degeneracies
         nativeClusteredEnt = clustering.Cluster_NativeEntanglements(HQNativeEnt['outfile'], outdir=os.path.join(outdir, "Native_clustered_HQ_GE"), outfile=f"{hq_id}.csv", chain=chain_id)
         print(f'Clustered native entanglements saved to {nativeClusteredEnt["outfile"]}')
-
-        # # Generate entanglement features for clustered native entanglements
-        # FGen = FeatureGen(struct, outdir=os.path.join(outdir, "Native_clustered_HQ_GE_features"), cluster_file=nativeClusteredEnt['outfile'])
-        # EntFeatures = FGen.get_uent_features(gene=args.Accession, chain=chain_id, pdbid=ID)
-        # print(f'Entanglement features saved to {EntFeatures["outfile"]}')
 
 
     print(f'NORMAL TERMINATION - {time.time() - start_time} seconds')

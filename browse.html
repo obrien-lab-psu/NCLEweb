@@ -229,17 +229,6 @@
                             }
                         },
                         {
-                            title: "Uniprot ID", 
-                            field: "uniprot_id", 
-                            width: 120,
-                            headerFilter: "input"
-                        },
-                        {
-                            title: "Email", 
-                            field: "email", 
-                            width: 150
-                        },
-                        {
                             title: "Entanglements", 
                             field: "num_entanglements", 
                             width: 130,
@@ -268,6 +257,18 @@
                             field: "upload_timestamp", 
                             width: 180,
                             formatter: (cell) => formatDate(cell.getValue())
+                        },
+                        {
+                            title: "Uniprot ID", 
+                            field: "uniprot_id", 
+                            width: 120,
+                            headerFilter: "input"
+                        },
+                        {
+                            title: "Description", 
+                            field: "description", 
+                            width: 200,
+                            headerFilter: "input"
                         },
                         {
                             title: "Actions", 

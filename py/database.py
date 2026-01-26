@@ -38,6 +38,8 @@ class Job(Base):
     coarse_grained = Column(Boolean, nullable=False, default=False)
     ca_contact = Column(Boolean, nullable=False, default=False)
     skipped_chains = Column(Text, nullable=True)  # JSON array of chains that failed QC
+    structure_type = Column(String, nullable=True, default='EXP')  # EXP or AF
+    ent_detection_method = Column(Integer, nullable=True, default=3)  # 1=GLN, 2=TLN, 3=Consensus
     
     # Relationship to results
     results = relationship("Result", back_populates="job", cascade="all, delete-orphan")
@@ -64,7 +66,9 @@ class Job(Base):
             'num_chains': self.num_chains,
             'coarse_grained': self.coarse_grained,
             'ca_contact': self.ca_contact,
-            'skipped_chains': json.loads(self.skipped_chains) if self.skipped_chains else []
+            'skipped_chains': json.loads(self.skipped_chains) if self.skipped_chains else [],
+            'structure_type': self.structure_type,
+            'ent_detection_method': self.ent_detection_method
         }
         if include_email:
             data['email'] = self.email
@@ -235,7 +239,7 @@ class Database:
         """Get a new database session"""
         return self.Session()
     
-    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False, rcsb_pdb_id=None):
+    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False, rcsb_pdb_id=None, structure_type='EXP', ent_detection_method=3):
         """Create a new job entry"""
         session = self.get_session()
         try:
@@ -249,7 +253,9 @@ class Database:
                 status='pending',
                 coarse_grained=coarse_grained,
                 ca_contact=ca_contact,
-                rcsb_pdb_id=rcsb_pdb_id
+                rcsb_pdb_id=rcsb_pdb_id,
+                structure_type=structure_type,
+                ent_detection_method=ent_detection_method
             )
             session.add(job)
             session.commit()

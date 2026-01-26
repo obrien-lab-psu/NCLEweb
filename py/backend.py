@@ -549,6 +549,12 @@ async def submit_job(
     if not job_name or len(job_name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Job name is required")
     
+    # Auto-enable C-alpha contacts for AlphaFold models (same as run_nativeNCLE.py)
+    # This reduces memory usage and is the standard approach for AF structures
+    if structure_type.upper() == 'AF' and not ca_contact and not coarse_grained:
+        ca_contact = True
+        print(f"Auto-enabling C-alpha contacts for AlphaFold structure: {job_name}")
+    
     # Handle PDB ID input type
     if input_type == "pdb_id":
         if not rcsb_pdb_id:
@@ -579,7 +585,9 @@ async def submit_job(
             description=description.strip() if description else None,
             coarse_grained=coarse_grained,
             ca_contact=ca_contact,
-            rcsb_pdb_id=rcsb_pdb_id
+            rcsb_pdb_id=rcsb_pdb_id,
+            structure_type=structure_type,
+            ent_detection_method=ent_detection_method
         )
         
         # Download PDB file from RCSB
@@ -620,7 +628,9 @@ async def submit_job(
             description=description.strip() if description else None,
             coarse_grained=coarse_grained,
             ca_contact=ca_contact,
-            rcsb_pdb_id=None
+            rcsb_pdb_id=None,
+            structure_type=structure_type,
+            ent_detection_method=ent_detection_method
         )
         
         # Save PDB file temporarily

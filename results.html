@@ -227,7 +227,7 @@
                             </label>
                             <label style="display: flex; align-items: center; cursor: pointer;">
                                 <input type="checkbox" id="toggleHQResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
-                                <span style="font-weight: 500;">Native_HQ_GE Results (Slipknots Removed)</span>
+                                <span style="font-weight: 500;">Native_HQ_GE Results</span>
                             </label>
                             <label style="display: flex; align-items: center; cursor: pointer;">
                                 <input type="checkbox" id="toggleClusteredResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
@@ -250,7 +250,7 @@
 
                     <!-- High-Quality Results Table -->
                     <div class="table-section" id="hqResultsSection" style="display: none;">
-                        <h3>Native_HQ_GE Results (Slipknots Removed)</h3>
+                        <h3>Native_HQ_GE Results</h3>
                         <div id="hqResultsTable" class="table-container">
                             <!-- Tabulator table for HQ results will be rendered here -->
                         </div>
@@ -601,10 +601,14 @@
                 { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
                 { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
                 { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
-                { title: "Gn", field: "Gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
-                { title: "Gc", field: "Gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+                { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+                { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+                { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
                 { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
-                { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+                { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
+                { title: "Slipknot_N", field: "Slipknot_N", minWidth: 100, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
+                { title: "Slipknot_C", field: "Slipknot_C", minWidth: 100, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
             ];
 
             hqResultsTable = new Tabulator("#hqResultsTable", {

@@ -114,18 +114,18 @@ pip install sqlalchemy python-multipart
 cd ~/git_repos/NCLEweb
 source venv/bin/activate
 
-# Start backend on port 8001 (or any available port)
-uvicorn py.backend:app --reload --host 127.0.0.1 --port 8001
+# Start backend on port 8000 (or any available port)
+uvicorn py.backend:app --reload --host 127.0.0.1 --port 8000
 ```
 
 **Access locally:**
 - Open HTML files directly in browser: `file:///path/to/NCLEweb/index.html`
-- Frontend automatically uses localhost:8001 when accessed via file:// protocol
-- Backend API: http://127.0.0.1:8001
-- API docs: http://127.0.0.1:8001/docs
+- Frontend automatically uses localhost:8000 when accessed via file:// protocol
+- Backend API: http://127.0.0.1:8000
+- API docs: http://127.0.0.1:8000/docs
 
 **Note:** The frontend uses dynamic API URLs:
-- When opened locally (file:// protocol): API calls go to http://127.0.0.1:8001
+- When opened locally (file:// protocol): API calls go to http://127.0.0.1:8000
 - When served via production domain: API calls go to https://your-domain.com
 This allows seamless testing locally and deployment to production without code changes.
 
@@ -171,6 +171,7 @@ Submit a PDB structure for analysis.
   - `email`: Email for notifications
   - `organism`: Ecoli, Human, Yeast, or custom name
   - `cluster_cutoff`: Clustering cutoff (optional, for custom organisms)
+  - `ent_detection_method`: Detection method - 1 (GLN-based), 2 (TLN-based), or 3 (Consensus, default)
   - `description`: Job description (optional)
 
 **Response:**

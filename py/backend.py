@@ -19,6 +19,8 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # Load environment variables from .env file
 load_dotenv()
@@ -190,6 +192,9 @@ app = FastAPI(
     description="API for calculating Native Gaussian Entanglement from PDB structures",
     version="1.0.0"
 )
+
+# Thread pool for running heavy computations without blocking workers
+executor = ThreadPoolExecutor(max_workers=4)
 
 # Enable CORS for frontend access
 app.add_middleware(
@@ -377,7 +382,7 @@ def validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
-async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False, cluster_cutoff: Optional[int] = None):
+async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False, cluster_cutoff: Optional[int] = None, ent_detection_method: int = 3):
     """Background task to process job
     
     Parameters
@@ -398,13 +403,27 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
         Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter
     cluster_cutoff : int, optional
         Custom clustering cutoff (only for non-standard organisms)
+    ent_detection_method : int, optional
+        Entanglement detection method: 1=GLN-based, 2=TLN-based, 3=Consensus (default)
     """
     try:
         # Update status to processing
         db.update_job_status(job_id, 'processing')
         
-        # Run analysis (don't cleanup yet - we need to save the PDB file)
-        result = calculate_native_ge(temp_pdb_path, cleanup=False, structure_type=structure_type, organism=organism, coarse_grained=coarse_grained, ca_contact=ca_contact, cluster_cutoff=cluster_cutoff)
+        # Run analysis in thread pool to avoid blocking the worker
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            executor, 
+            calculate_native_ge, 
+            temp_pdb_path, 
+            False,  # cleanup
+            structure_type, 
+            organism, 
+            coarse_grained, 
+            ca_contact, 
+            cluster_cutoff,
+            ent_detection_method
+        )
         
         if not result['success']:
             # Job failed - cleanup temp file
@@ -473,7 +492,6 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
 
 @app.post("/api/submit-job")
 async def submit_job(
-    background_tasks: BackgroundTasks,
     email: str = Form(...),
     job_name: str = Form(...),
     uniprot_id: Optional[str] = Form(None),
@@ -483,6 +501,7 @@ async def submit_job(
     cluster_cutoff: Optional[int] = Form(None),
     coarse_grained: bool = Form(False),
     ca_contact: bool = Form(False),
+    ent_detection_method: int = Form(3),
     input_type: str = Form("file"),
     rcsb_pdb_id: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None)
@@ -612,8 +631,8 @@ async def submit_job(
     # Get base URL for email links
     base_url = os.getenv('BASE_URL', 'http://localhost:8000')
     
-    # Add background task to process the job
-    background_tasks.add_task(process_job_async, job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact, cluster_cutoff)
+    # Start processing job in background (fire and forget)
+    asyncio.create_task(process_job_async(job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact, cluster_cutoff, ent_detection_method))
     
     return JSONResponse(content={
         'success': True,

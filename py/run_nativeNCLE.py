@@ -27,10 +27,12 @@ if __name__ == "__main__":
     parser.add_argument("--ID", type=str, required=False, help="An id for the analysis (defaults to structure basename)")
     parser.add_argument("--chain", type=str, required=False, help="Chain identifier (optional, processes all chains if not specified)", default=None)
     parser.add_argument("--organism", type=str, required=False, help="Organism name for clustering: {Ecoli, Human, Yeast}", default='Ecoli')
+    parser.add_argument("--Accession", type=str, required=False, help="UniProt Accession for the protein", default='P00558')
     parser.add_argument("--cg", action='store_true', help="Indicate structure is coarse-grained (C-alpha only) model")
     parser.add_argument("--Calpha", action='store_true', help="Indicate structure is coarse-grained (C-alpha only) model")
     parser.add_argument("--cluster_cutoff", type=float, required=False, help="Clustering cutoff distance (default: 5.0)", default=52.0)
     parser.add_argument("--model", type=str, required=False, help="Model type for high-quality selection: {EXP, AF}", default='EXP')
+    parser.add_argument("--ent_detection_method", type=int, required=False, help="ENT detection method: 1=any GLN, 2=any TLN (default), 3=both GLN and TLN same termini", default=3)
     args = parser.parse_args()
     print(args)
     
@@ -42,8 +44,14 @@ if __name__ == "__main__":
     organism = args.organism
     cluster_cutoff = args.cluster_cutoff
     model = args.model
+
+    # Default to C-alpha representation for AF models to avoid the large all-atom contact map
+    # that can exhaust memory on big structures. Users can still override with --Calpha/--cg.
+    if model.upper() == 'AF' and not args.Calpha and not args.cg:
+        args.Calpha = True
+        print("Auto-enabling --Calpha for AF model to reduce memory usage (override with --Calpha/--cg as needed)")
     # Set up Gaussian Entanglement and Clustering objects
-    ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=args.Calpha, CG=args.cg)
+    ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=args.Calpha, CG=args.cg, ent_detection_method=args.ent_detection_method)
     clustering = ClusterNativeEntanglements(organism=organism, cut_off=cluster_cutoff)
 
     # Determine which chains to process
@@ -88,6 +96,5 @@ if __name__ == "__main__":
         # Cluster the native entanglements to remove degeneracies
         nativeClusteredEnt = clustering.Cluster_NativeEntanglements(HQNativeEnt['outfile'], outdir=os.path.join(outdir, "Native_clustered_HQ_GE"), outfile=f"{hq_id}.csv", chain=chain_id)
         print(f'Clustered native entanglements saved to {nativeClusteredEnt["outfile"]}')
-
 
     print(f'NORMAL TERMINATION - {time.time() - start_time} seconds')

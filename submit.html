@@ -413,6 +413,47 @@
                 </div>
                 <small>Select the type of contacts to use for analysis</small>
             </div>
+
+            <!-- Detection Method Selection -->
+            <div class="form-group">
+                <label>
+                    Entanglement Detection Method
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="detectionMethod1" 
+                            name="detectionMethod" 
+                            value="1"
+                            style="margin-right: 8px;"
+                        >
+                        <span><strong>Method 1:</strong> GLN-based (any nonzero Gaussian linking)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="detectionMethod2" 
+                            name="detectionMethod" 
+                            value="2"
+                            style="margin-right: 8px;"
+                        >
+                        <span><strong>Method 2:</strong> TLN-based (any nonzero topological linking)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="detectionMethod3" 
+                            name="detectionMethod" 
+                            value="3"
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span><strong>Method 3:</strong> Consensus (both GLN and TLN must agree) - Recommended</span>
+                    </label>
+                </div>
+                <small>Method used to determine if a non-covalent lasso entanglement is present</small>
+            </div>
             
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="window.location.href='index.html'">
@@ -458,7 +499,7 @@
     <script>
         // Use localhost for local file testing, otherwise use the same origin as the page
         const API_BASE_URL = window.location.protocol === 'file:' 
-            ? 'http://127.0.0.1:8001' 
+            ? 'http://127.0.0.1:8000' 
             : window.location.origin;
         const form = document.getElementById('submitForm');
         const submitBtn = document.getElementById('submitBtn');
@@ -555,6 +596,7 @@
             // Get model resolution and contact type
             const modelResolution = document.querySelector('input[name="modelResolution"]:checked').value;
             const contactType = document.querySelector('input[name="contactType"]:checked').value;
+            const detectionMethod = document.querySelector('input[name="detectionMethod"]:checked').value;
             const isCaCG = (modelResolution === 'ca-cg');
             const useCaContact = (contactType === 'ca-contact');
             
@@ -617,6 +659,7 @@
             
             formData.append('coarse_grained', isCaCG);
             formData.append('ca_contact', useCaContact);
+            formData.append('ent_detection_method', detectionMethod);
             formData.append('input_type', inputType);
             
             // Handle file upload or PDB ID

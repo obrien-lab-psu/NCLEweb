@@ -50,7 +50,7 @@ def get_chains(pdb_path):
         return ['']  # Return single empty chain on error
 
 
-def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None):
+def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None, ent_detection_method=3):
     """
     Calculate native Gaussian entanglement for a PDB file.
     Runs Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE analyses.
@@ -71,6 +71,8 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter, by default False
     cluster_cutoff : int, optional
         Custom clustering cutoff (only for non-standard organisms), by default None
+    ent_detection_method : int, optional
+        Entanglement detection method: 1=GLN-based, 2=TLN-based, 3=Consensus (default), by default 3
         
     Returns
     -------
@@ -179,11 +181,13 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
             # g_threshold=0.6, density=0.0
             # CG=coarse_grained (True for C-alpha only models, False for all-atom)
             # Calpha=ca_contact (True for C-alpha contacts, False for heavy atom contacts)
+            # ent_detection_method: 1=GLN-based, 2=TLN-based, 3=Consensus
             ge = GaussianEntanglement(
                 g_threshold=0.6, 
                 density=0.0, 
                 Calpha=ca_contact, 
-                CG=coarse_grained
+                CG=coarse_grained,
+                ent_detection_method=ent_detection_method
             )
             
             # Calculate native entanglements (Step 1: Native_GE)

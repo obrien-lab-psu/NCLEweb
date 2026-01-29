@@ -521,6 +521,12 @@ class Database:
         import pandas as pd
         import numpy as np
         
+        # DEBUG: Log what columns are in the dataframe
+        print(f"\n[DEBUG] save_entanglement_features for job {job_id}")
+        print(f"[DEBUG] DataFrame columns: {list(features_df.columns)}")
+        if len(features_df) > 0:
+            print(f"[DEBUG] First row - ENT-ID: {features_df.iloc[0].get('ENT-ID', 'N/A')}, N_term: {features_df.iloc[0].get('N_term_thread', 'N/A')}, C_term: {features_df.iloc[0].get('C_term_thread', 'N/A')}, crossingsN: {features_df.iloc[0].get('crossingsN', 'N/A')}, crossingsC: {features_df.iloc[0].get('crossingsC', 'N/A')}")
+        
         session = self.get_session()
         try:
             for idx, (_, row) in enumerate(features_df.iterrows()):

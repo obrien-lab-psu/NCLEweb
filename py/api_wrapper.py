@@ -371,7 +371,14 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                                 # Read features CSV
                                 features_df = pd.read_csv(features_file, sep='|')
                                 all_features_dfs.append(features_df)
-                                log_file.write(f"    ✓ Loaded {len(features_df)} features from CSV\n")
+                                # DEBUG: Copy CSV to keep it for inspection
+                                debug_csv_path = f"/tmp/debug_features_{chain if chain else 'default'}.csv"
+                                import shutil
+                                shutil.copy(features_file, debug_csv_path)
+                                log_file.write(f"    ✓ Loaded {len(features_df)} features from CSV (copied to {debug_csv_path})\n")
+                                log_file.write(f"    Columns: {list(features_df.columns)}\n")
+                                if len(features_df) > 0:
+                                    log_file.write(f"    First row: ENT-ID={features_df.iloc[0].get('ENT-ID')}, N_term={features_df.iloc[0].get('N_term_thread')}, C_term={features_df.iloc[0].get('C_term_thread')}, crossingsN={features_df.iloc[0].get('crossingsN')}, crossingsC={features_df.iloc[0].get('crossingsC')}\n")
                                 log_file.flush()
                                 print(f"Generated features for chain {chain if chain else 'default'}: {len(features_df)} features")
                             else:

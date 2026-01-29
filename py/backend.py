@@ -5,7 +5,7 @@ Provides REST API endpoints for Gaussian Entanglement analysis
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import PlainTextResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -21,6 +21,8 @@ from datetime import datetime
 from dotenv import load_dotenv
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+import zipfile
+import io
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,7 +31,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from api_wrapper import calculate_native_ge
-from database import db, Job, Result
+from database import db, Job, Result, HQResult, ClusteredResult
 from email_notifier import email_notifier
 
 
@@ -382,7 +384,7 @@ def validate_email(email: str) -> bool:
     return bool(re.match(pattern, email))
 
 
-async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False, cluster_cutoff: Optional[int] = None, ent_detection_method: int = 3):
+async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, structure_type: str = "EXP", organism: str = "Ecoli", coarse_grained: bool = False, ca_contact: bool = False, cluster_cutoff: Optional[int] = None, ent_detection_method: int = 3, uniprot_id: Optional[str] = None, generate_features: bool = False):
     """Background task to process job
     
     Parameters
@@ -405,6 +407,10 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
         Custom clustering cutoff (only for non-standard organisms)
     ent_detection_method : int, optional
         Entanglement detection method: 1=GLN-based, 2=TLN-based, 3=Consensus (default)
+    uniprot_id : str, optional
+        UniProt accession ID for generating features
+    generate_features : bool
+        Whether to generate entanglement features
     """
     try:
         # Update status to processing
@@ -422,7 +428,9 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
             coarse_grained, 
             ca_contact, 
             cluster_cutoff,
-            ent_detection_method
+            ent_detection_method,
+            uniprot_id,
+            generate_features
         )
         
         if not result['success']:
@@ -463,6 +471,24 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
             clustered_results_df=result.get('clustered_data'),
             skipped_chains=result.get('skipped_chains', [])
         )
+        
+        # Load entanglement features if requested
+        # Currently only supports features from FeatureGen if it was successfully generated
+        if generate_features and uniprot_id:
+            try:
+                # Only save features if FeatureGen actually generated them during processing
+                if result.get('features_data') is not None:
+                    features_df = result.get('features_data')
+                    if isinstance(features_df, pd.DataFrame) and len(features_df) > 0:
+                        db.save_entanglement_features(job_id, features_df)
+                        print(f"✓ Saved {len(features_df)} entanglement features for job {job_id}")
+                else:
+                    print(f"⚠ Feature generation was requested but no features were returned by FeatureGen")
+            except Exception as e:
+                import traceback
+                print(f"⚠ Warning: Feature handling failed for job {job_id}: {e}")
+                traceback.print_exc()
+        
         db.update_job_status(job_id, 'completed')
         
         # Send completion email
@@ -502,6 +528,7 @@ async def submit_job(
     coarse_grained: bool = Form(False),
     ca_contact: bool = Form(False),
     ent_detection_method: int = Form(3),
+    generate_features: bool = Form(False),
     input_type: str = Form("file"),
     rcsb_pdb_id: Optional[str] = Form(None),
     file: Optional[UploadFile] = File(None)
@@ -529,6 +556,10 @@ async def submit_job(
         Whether the structure is coarse-grained (C-alpha only) - sets CG parameter
     ca_contact : bool
         Whether to use C-alpha contacts (vs heavy atom contacts) - sets Calpha parameter
+    ent_detection_method : int
+        Entanglement detection method: 1=GLN-based, 2=TLN-based, 3=Consensus (default)
+    generate_features : bool
+        Whether to generate entanglement features (requires uniprot_id)
     input_type : str
         Type of input: "file" or "pdb_id"
     rcsb_pdb_id : str, optional
@@ -548,6 +579,10 @@ async def submit_job(
     
     if not job_name or len(job_name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Job name is required")
+    
+    # If generate_features is requested, uniprot_id is required
+    if generate_features and not uniprot_id:
+        raise HTTPException(status_code=400, detail="UniProt Accession ID is required when generating entanglement features")
     
     # Auto-enable C-alpha contacts for AlphaFold models (same as run_nativeNCLE.py)
     # This reduces memory usage and is the standard approach for AF structures
@@ -587,7 +622,8 @@ async def submit_job(
             ca_contact=ca_contact,
             rcsb_pdb_id=rcsb_pdb_id,
             structure_type=structure_type,
-            ent_detection_method=ent_detection_method
+            ent_detection_method=ent_detection_method,
+            generate_features=generate_features
         )
         
         # Download PDB file from RCSB
@@ -630,7 +666,8 @@ async def submit_job(
             ca_contact=ca_contact,
             rcsb_pdb_id=None,
             structure_type=structure_type,
-            ent_detection_method=ent_detection_method
+            ent_detection_method=ent_detection_method,
+            generate_features=generate_features
         )
         
         # Save PDB file temporarily
@@ -642,7 +679,7 @@ async def submit_job(
     base_url = os.getenv('BASE_URL', 'http://localhost:8000')
     
     # Start processing job in background (fire and forget)
-    asyncio.create_task(process_job_async(job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact, cluster_cutoff, ent_detection_method))
+    asyncio.create_task(process_job_async(job_id, temp_pdb.name, base_url, structure_type, organism, coarse_grained, ca_contact, cluster_cutoff, ent_detection_method, uniprot_id, generate_features))
     
     return JSONResponse(content={
         'success': True,
@@ -720,6 +757,11 @@ async def get_job_details(job_id: str):
         # Split HQ results 'c' column back to crossingsN and crossingsC
         hq_results = split_combined_crossings(job_data.get('hq_results', []))
         
+        # Get entanglement features if they exist
+        features_data = []
+        if job_data['job'].get('generate_features'):
+            features_data = db.get_entanglement_features(job_id)
+        
         return JSONResponse(content={
             'success': True,
             'job_name': job_data['job']['job_name'],
@@ -734,9 +776,11 @@ async def get_job_details(job_id: str):
             'num_chains': job_data['job']['num_chains'],
             'coarse_grained': job_data['job']['coarse_grained'],
             'ca_contact': job_data['job']['ca_contact'],
+            'generate_features': job_data['job'].get('generate_features', False),
             'results': job_data['results'],
             'hq_results': hq_results,
             'clustered_results': clustered_results,
+            'features_data': features_data,
             'error_message': job_data['job'].get('error_message'),
             'pdb_content': pdb_content
         })
@@ -767,6 +811,88 @@ async def get_job_pdb(job_id: str):
         status_code=501,
         detail="PDB file retrieval not implemented yet. PDB files are not permanently stored."
     )
+
+
+@app.get("/api/jobs/{job_id}/download-results")
+async def download_job_results(job_id: str):
+    """
+    Download all analysis results as a zip file
+    
+    Parameters
+    ----------
+    job_id : str
+        Job UUID
+        
+    Returns
+    -------
+    StreamingResponse
+        Zip file containing Native_GE, Native_HQ_GE, Native_clustered_HQ_GE, and features CSV files
+    """
+    try:
+        # Get job info
+        session = db.get_session()
+        job = session.query(Job).filter_by(job_id=job_id).first()
+        session.close()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        if job.status != 'completed':
+            raise HTTPException(status_code=400, detail=f"Job {job_id} has not completed yet")
+        
+        # Create zip file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Get results from database and create CSV files
+            session = db.get_session()
+            
+            # Native_GE results
+            native_results = session.query(Result).filter_by(job_id=job_id).all()
+            if native_results:
+                native_df = pd.DataFrame([r.to_dict() for r in native_results])
+                native_csv = native_df.to_csv(index=False, sep='|')
+                zip_file.writestr('Native_GE/results.csv', native_csv)
+            
+            # Native_HQ_GE results
+            hq_results = session.query(HQResult).filter_by(job_id=job_id).all()
+            if hq_results:
+                hq_df = pd.DataFrame([r.to_dict() for r in hq_results])
+                hq_csv = hq_df.to_csv(index=False, sep='|')
+                zip_file.writestr('Native_HQ_GE/results.csv', hq_csv)
+            
+            # Native_clustered_HQ_GE results
+            clustered_results = session.query(ClusteredResult).filter_by(job_id=job_id).all()
+            if clustered_results:
+                clustered_df = pd.DataFrame([r.to_dict() for r in clustered_results])
+                clustered_csv = clustered_df.to_csv(index=False, sep='|')
+                zip_file.writestr('Native_clustered_HQ_GE/results.csv', clustered_csv)
+            
+            # Entanglement features
+            from database import EntanglementFeature
+            features = session.query(EntanglementFeature).filter_by(job_id=job_id).all()
+            if features:
+                features_df = pd.DataFrame([f.to_dict() for f in features])
+                features_csv = features_df.to_csv(index=False, sep='|')
+                zip_file.writestr('Native_clustered_HQ_GE_features/results.csv', features_csv)
+            
+            session.close()
+        
+        # Prepare zip file for streaming
+        zip_buffer.seek(0)
+        
+        return StreamingResponse(
+            iter([zip_buffer.getvalue()]),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=ncle_results_{job_id[:8]}.zip"}
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error downloading results for job {job_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error downloading results: {str(e)}")
+
 
 
 if __name__ == "__main__":

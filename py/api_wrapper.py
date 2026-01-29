@@ -16,13 +16,20 @@ import MDAnalysis as mda
 # Import PDB preprocessor
 from pdb_preprocessor import preprocess_pdb
 
-# Try to import clustering - it may not be available in all environments
+# Try to import clustering and feature generation - they may not be available in all environments
 try:
     from EntDetect.clustering import ClusterNativeEntanglements
     CLUSTERING_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Clustering not available: {e}")
     CLUSTERING_AVAILABLE = False
+
+try:
+    from EntDetect.entanglement_features import FeatureGen
+    FEATURE_GEN_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Feature generation not available: {e}")
+    FEATURE_GEN_AVAILABLE = False
 
 
 def get_chains(pdb_path):
@@ -50,10 +57,11 @@ def get_chains(pdb_path):
         return ['']  # Return single empty chain on error
 
 
-def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None, ent_detection_method=3):
+def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None, ent_detection_method=3, uniprot_id=None, generate_features=False):
     """
     Calculate native Gaussian entanglement for a PDB file.
     Runs Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE analyses.
+    Optionally generates entanglement features.
     
     Parameters
     ----------
@@ -73,6 +81,10 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         Custom clustering cutoff (only for non-standard organisms), by default None
     ent_detection_method : int, optional
         Entanglement detection method: 1=GLN-based, 2=TLN-based, 3=Consensus (default), by default 3
+    uniprot_id : str, optional
+        UniProt accession ID for feature generation, by default None
+    generate_features : bool, optional
+        Whether to generate entanglement features, by default False
         
     Returns
     -------
@@ -85,6 +97,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         - 'hq_csv': str with CSV-formatted Native_HQ_GE results (if success=True)
         - 'clustered_data': pandas DataFrame with clustered results (if success=True)
         - 'clustered_csv': str with CSV-formatted clustered results (if success=True)
+        - 'features_data': pandas DataFrame with features (if generate_features=True and success=True)
         - 'error': str with error message (if success=False)
         - 'pdb_id': str identifier from filename
         - 'warnings': list of preprocessing warnings
@@ -97,6 +110,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         'hq_csv': None,
         'clustered_data': None,
         'clustered_csv': None,
+        'features_data': None,
         'error': None,
         'pdb_id': None,
         'warnings': []
@@ -304,7 +318,103 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
             result['clustered_csv'] = None
             print("Clustering module not available (pyemma dependency missing)")
         
+        # Generate entanglement features if requested
+        import sys
+        log_file = open('logs/feature_generation.log', 'a')
+        log_msg = f"\n>>> Feature generation check for {pdb_id}:\n    generate_features={generate_features}\n    uniprot_id={uniprot_id}\n    clustered_data present={result.get('clustered_data') is not None}\n    FEATURE_GEN_AVAILABLE={FEATURE_GEN_AVAILABLE}\n"
+        log_file.write(log_msg)
+        log_file.flush()
+        print(log_msg, file=sys.stderr)
+        
+        if generate_features and uniprot_id and result.get('clustered_data') is not None and FEATURE_GEN_AVAILABLE:
+            try:
+                log_file.write(f"\n>>> STARTING FEATURE GENERATION for {uniprot_id}\n")
+                log_file.flush()
+                print(f"\n>>> STARTING FEATURE GENERATION <<<", file=sys.stderr)
+                print(f"Generating entanglement features for {uniprot_id}", file=sys.stderr)
+                
+                clustered_file_path = os.path.join(temp_dir, f'combined_clustered_{pdb_id}.csv')
+                result['clustered_data'].to_csv(clustered_file_path, sep='|', index=False)
+                
+                # Generate features for each chain
+                all_features_dfs = []
+                log_file.write(f"  Chains detected: {chains}\n")
+                log_file.flush()
+                print(f"DEBUG: About to iterate over chains: {chains}", file=sys.stderr)
+                for chain in chains:
+                    print(f"DEBUG: Processing chain: {chain}", file=sys.stderr)
+                    try:
+                        chain_id = f"{pdb_id}_{chain}" if chain else pdb_id
+                        log_file.write(f"  Processing chain: {chain if chain else 'empty'}\n")
+                        
+                        # Create FeatureGen instance
+                        fgen = FeatureGen(
+                            PDBfile=analysis_pdb,  # Use filtered PDB
+                            outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
+                            cluster_file=clustered_file_path
+                        )
+                        
+                        # Get entanglement features
+                        features_result = fgen.get_uent_features(
+                            gene=uniprot_id,
+                            chain=chain if chain else None,
+                            pdbid=pdb_id
+                        )
+                        
+                        log_file.write(f"    features_result type: {type(features_result)}, value: {features_result}\n")
+                        log_file.flush()
+                        
+                        if features_result and 'outfile' in features_result:
+                            features_file = features_result['outfile']
+                            log_file.write(f"    Found outfile: {features_file}\n")
+                            if os.path.exists(features_file):
+                                # Read features CSV
+                                features_df = pd.read_csv(features_file, sep='|')
+                                all_features_dfs.append(features_df)
+                                log_file.write(f"    ✓ Loaded {len(features_df)} features from CSV\n")
+                                log_file.flush()
+                                print(f"Generated features for chain {chain if chain else 'default'}: {len(features_df)} features")
+                            else:
+                                log_file.write(f"    ✗ Outfile does not exist: {features_file}\n")
+                                log_file.flush()
+                        else:
+                            log_file.write(f"    ✗ No outfile in result or result is empty\n")
+                            log_file.flush()
+                    except Exception as e:
+                        log_file.write(f"    ✗ Exception: {e}\n")
+                        log_file.flush()
+                        print(f"Warning: Could not generate features for chain {chain}: {e}")
+                
+                if all_features_dfs:
+                    combined_features_df = pd.concat(all_features_dfs, ignore_index=True)
+                    result['features_data'] = combined_features_df
+                    log_file.write(f"SUCCESS: Combined {len(combined_features_df)} features from {len(all_features_dfs)} chain(s)\n")
+                    log_file.flush()
+                    print(f"Combined features: {len(combined_features_df)} total features from {len(all_features_dfs)} chain(s)")
+                else:
+                    log_file.write("FAILED: No features generated for any chain\n")
+                    log_file.flush()
+                    print("No features generated for any chain")
+            except Exception as e:
+                log_file.write(f"EXCEPTION during feature generation: {e}\n")
+                log_file.flush()
+                print(f"Warning: Feature generation failed: {e}")
+                result['features_data'] = None
+        elif generate_features and not FEATURE_GEN_AVAILABLE:
+            log_file.write("WARNING: Feature generation requested but FeatureGen module not available\n")
+            log_file.flush()
+            print("Warning: Feature generation requested but FeatureGen module not available")
+        
+        log_file.close()
+        
     except Exception as e:
+        # Log to file as well
+        try:
+            with open('logs/feature_generation.log', 'a') as lf:
+                lf.write(f"OUTER EXCEPTION: {e}\n")
+                lf.flush()
+        except:
+            pass
         result['error'] = str(e)
         print(f"Error during analysis: {e}")
         

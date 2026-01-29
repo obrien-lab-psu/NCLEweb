@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from EntDetect.gaussian_entanglement import GaussianEntanglement
 from EntDetect.clustering import ClusterNativeEntanglements
+from EntDetect.entanglement_features import FeatureGen
 
 """
 python scripts/run_nativeNCLE.py 
@@ -96,5 +97,11 @@ if __name__ == "__main__":
         # Cluster the native entanglements to remove degeneracies
         nativeClusteredEnt = clustering.Cluster_NativeEntanglements(HQNativeEnt['outfile'], outdir=os.path.join(outdir, "Native_clustered_HQ_GE"), outfile=f"{hq_id}.csv", chain=chain_id)
         print(f'Clustered native entanglements saved to {nativeClusteredEnt["outfile"]}')
+
+        # Generate entanglement features for clustered native entanglements
+        FGen = FeatureGen(struct, outdir=os.path.join(outdir, "Native_clustered_HQ_GE_features"), cluster_file=nativeClusteredEnt['outfile'])
+        EntFeatures = FGen.get_uent_features(gene=args.Accession, chain=chain_id, pdbid=ID)
+        print(f'Entanglement features saved to {EntFeatures["outfile"]}')
+
 
     print(f'NORMAL TERMINATION - {time.time() - start_time} seconds')

@@ -455,6 +455,21 @@
                 <small>Method used to determine if a non-covalent lasso entanglement is present</small>
             </div>
             
+            <!-- Generate NCLE Features Option -->
+            <div class="form-group">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input 
+                        type="checkbox" 
+                        id="generateFeatures" 
+                        name="generateFeatures"
+                        style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;"
+                        onchange="toggleFeaturesRequirement()"
+                    >
+                    <span><strong>Generate Entanglement Features</strong></span>
+                </label>
+                <small>If enabled, additional entanglement features will be calculated and included in results. Requires UniProt Accession ID (must be provided below).</small>
+            </div>
+            
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="window.location.href='index.html'">
                     Cancel
@@ -467,7 +482,7 @@
             <!-- Optional Fields -->
             <div class="form-group">
                 <label for="uniprotId">
-                    Uniprot ID (optional)
+                    UniProt Accession ID <span id="uniprotRequired" class="required" style="display: none;">*</span>
                 </label>
                 <input 
                     type="text" 
@@ -476,7 +491,7 @@
                     placeholder="P12345"
                     maxlength="50"
                 >
-                <small>If your protein has a Uniprot identifier</small>
+                <small id="uniprotHelp">Optional UniProt accession for your protein (e.g., P12345). <strong>Required</strong> if generating entanglement features.</small>
             </div>
             
             <div class="form-group">
@@ -523,6 +538,25 @@
             // Set required attribute based on selection
             document.getElementById('customOrganismName').required = customSelected;
             document.getElementById('customCutoff').required = customSelected;
+        }
+        
+        function toggleFeaturesRequirement() {
+            const generateFeatures = document.getElementById('generateFeatures').checked;
+            const uniprotField = document.getElementById('uniprotId');
+            const uniprotRequired = document.getElementById('uniprotRequired');
+            const uniprotHelp = document.getElementById('uniprotHelp');
+            
+            if (generateFeatures) {
+                uniprotField.required = true;
+                uniprotRequired.style.display = 'inline';
+                uniprotHelp.innerHTML = '<strong>Required:</strong> UniProt accession ID is required to generate entanglement features (e.g., P12345).';
+                uniprotField.style.borderColor = '#e74c3c';
+            } else {
+                uniprotField.required = false;
+                uniprotRequired.style.display = 'none';
+                uniprotHelp.innerHTML = 'Optional UniProt accession for your protein (e.g., P12345). <strong>Required</strong> if generating entanglement features.';
+                uniprotField.style.borderColor = '';
+            }
         }
         
         function showStatus(message, type) {
@@ -626,8 +660,24 @@
             const formData = new FormData();
             formData.append('email', document.getElementById('email').value);
             formData.append('job_name', document.getElementById('jobName').value);
-            formData.append('uniprot_id', document.getElementById('uniprotId').value);
+            
+            // Check if generating features requires UniProt ID
+            const generateFeatures = document.getElementById('generateFeatures').checked;
+            const uniprotId = document.getElementById('uniprotId').value.trim();
+            
+            if (generateFeatures && !uniprotId) {
+                showStatus('UniProt Accession ID is required when generating entanglement features', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Analysis';
+                return;
+            }
+            
+            formData.append('uniprot_id', uniprotId);
             formData.append('description', document.getElementById('description').value);
+            // Only append generate_features if it's true to avoid form parsing issues
+            if (generateFeatures) {
+                formData.append('generate_features', 'on');
+            }
             const structureType = document.querySelector('input[name="structureType"]:checked').value;
             formData.append('structure_type', structureType);
             
@@ -657,8 +707,13 @@
                 formData.append('organism', organismRadio);
             }
             
-            formData.append('coarse_grained', isCaCG);
-            formData.append('ca_contact', useCaContact);
+            // Only append boolean flags if true to avoid form parsing issues
+            if (isCaCG) {
+                formData.append('coarse_grained', 'on');
+            }
+            if (useCaContact) {
+                formData.append('ca_contact', 'on');
+            }
             formData.append('ent_detection_method', detectionMethod);
             formData.append('input_type', inputType);
             
@@ -692,7 +747,20 @@
                     body: formData
                 });
                 
-                const data = await response.json();
+                // Try to parse response as JSON, with fallback to text
+                let data;
+                let responseText;
+                try {
+                    responseText = await response.text();
+                    data = responseText ? JSON.parse(responseText) : {};
+                } catch (e) {
+                    // If JSON parsing fails, show the raw response
+                    console.error('Response was not JSON. Status:', response.status, 'Content:', responseText);
+                    showStatus(`Server error: ${responseText || e.message}`, 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit Analysis';
+                    return;
+                }
                 
                 if (response.ok && data.success) {
                     const message = data.is_cached 

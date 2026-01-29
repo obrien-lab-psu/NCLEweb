@@ -182,7 +182,7 @@
                 <div class="results-header">
                     <h2 id="resultsTitle">Entanglement Results</h2>
                     <div class="results-actions">
-                        <button id="downloadCSV" class="btn btn-primary">Download CSV</button>
+                        <button id="downloadCSV" class="btn btn-primary">Download ZIP</button>
                         <button onclick="window.location.href='browse.html'" class="btn btn-secondary">
                             Return to Browse
                         </button>
@@ -233,6 +233,10 @@
                                 <input type="checkbox" id="toggleClusteredResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
                                 <span style="font-weight: 500;">Native_clustered_HQ_GE (Clustered)</span>
                             </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;" id="featuresToggleLabel" style="display: none;">
+                                <input type="checkbox" id="toggleFeatures" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Entanglement Features</span>
+                            </label>
                         </div>
                     </div>
 
@@ -271,6 +275,18 @@
                             <p>No clustered entanglements found.</p>
                         </div>
                     </div>
+
+                    <!-- Entanglement Features Table -->
+                    <div class="table-section" id="featuresSection" style="display: none;">
+                        <h3>Entanglement Features</h3>
+                        <div id="featuresTable" class="table-container">
+                            <!-- Tabulator table for features will be rendered here -->
+                        </div>
+                        
+                        <div id="noFeatures" class="no-results" style="display: none;">
+                            <p>No entanglement features available for this job.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -284,9 +300,11 @@
         let jobId = null;
         let jobData = null;
         let currentJobData = null;  // Store full job data including flags
+        let jobName = null;  // Store job name for download
         let resultsTable = null;
         let hqResultsTable = null;
         let clusteredResultsTable = null;
+        let featuresTable = null;
         let nglStage = null;
         let pdbFileContent = null;
         let currentChain = 'all';
@@ -297,9 +315,11 @@
             const toggleNativeGE = document.getElementById('toggleNativeGE');
             const toggleHQResults = document.getElementById('toggleHQResults');
             const toggleClusteredResults = document.getElementById('toggleClusteredResults');
+            const toggleFeatures = document.getElementById('toggleFeatures');
             const nativeGESection = document.getElementById('nativeGESection');
             const hqResultsSection = document.getElementById('hqResultsSection');
             const clusteredResultsSection = document.getElementById('clusteredResultsSection');
+            const featuresSection = document.getElementById('featuresSection');
 
             if (toggleNativeGE) {
                 toggleNativeGE.addEventListener('change', function() {
@@ -316,6 +336,14 @@
             if (toggleClusteredResults) {
                 toggleClusteredResults.addEventListener('change', function() {
                     clusteredResultsSection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+
+            if (toggleFeatures) {
+                toggleFeatures.addEventListener('change', function() {
+                    if (featuresSection) {
+                        featuresSection.style.display = this.checked ? 'block' : 'none';
+                    }
                 });
             }
         }
@@ -467,6 +495,11 @@
             // Render clustered table if available
             renderClusteredTable(clusteredResults);
             
+            // Load entanglement features if available
+            if (data.generate_features) {
+                loadEntanglementFeatures(data.features_data || []);
+            }
+            
             // Load structure into NGL viewer if PDB content is available
             if (data.pdb_content) {
                 pdbFileContent = data.pdb_content;
@@ -482,8 +515,11 @@
                 `;
             }
             
+            // Store job name for download
+            jobName = data.job_name;
+            
             // Setup download CSV button
-            document.getElementById('downloadCSV').onclick = () => downloadCSV(results, data.job_name);
+            document.getElementById('downloadCSV').onclick = () => downloadResults(jobId, jobName);
         }
 
         // Show processing message
@@ -1103,40 +1139,143 @@
             nglStage.setSpin(isSpinning);
         });
 
+        // Load and render entanglement features
+        function loadEntanglementFeatures(features) {
+            try {
+                if (!features || features.length === 0) {
+                    document.getElementById('noFeatures').style.display = 'block';
+                    document.getElementById('featuresTable').style.display = 'none';
+                    // Show the toggle if features were requested but none found
+                    document.getElementById('featuresToggleLabel').style.display = 'flex';
+                    document.getElementById('featuresSection').style.display = 'block';
+                    return;
+                }
+                
+                // Show features section, toggle, and table
+                document.getElementById('featuresToggleLabel').style.display = 'flex';
+                document.getElementById('featuresSection').style.display = 'block';
+                document.getElementById('noFeatures').style.display = 'none';
+                document.getElementById('featuresTable').style.display = 'block';
+                
+                // Make sure toggle is checked
+                const toggleFeatures = document.getElementById('toggleFeatures');
+                if (toggleFeatures) {
+                    toggleFeatures.checked = true;
+                }
+                
+                // Render features table
+                renderFeaturesTable(features);
+                
+            } catch (error) {
+                console.error('Error loading entanglement features:', error);
+                document.getElementById('noFeatures').style.display = 'block';
+                document.getElementById('featuresTable').style.display = 'none';
+            }
+        }
+
+        // Render entanglement features table
+        function renderFeaturesTable(data) {
+            console.log('renderFeaturesTable called with', data.length, 'rows');
+            if (data.length > 0) {
+                console.log('First row full data:', data[0]);
+                console.log('  gn field:', data[0].gn);
+                console.log('  gc field:', data[0].gc);
+            }
+            
+            // Destroy existing table if it exists
+            if (featuresTable && typeof featuresTable.destroy === 'function') {
+                try {
+                    featuresTable.destroy();
+                    console.log('Destroyed existing features table');
+                } catch (e) {
+                    console.warn('Could not destroy existing features table:', e);
+                }
+            }
+            
+            const columns = [
+                { title: "Gene", field: "gene", minWidth: 80, widthGrow: 1 },
+                { title: "PDB", field: "pdb", minWidth: 100, widthGrow: 1 },
+                { title: "Chain", field: "chain", minWidth: 60, widthGrow: 0.5 },
+                { title: "ENT-ID", field: "ent_id", minWidth: 70, widthGrow: 0.5, hozAlign: "center" },
+                { title: "Gn", field: "gn", minWidth: 70, widthGrow: 0.8 },
+                { title: "N-Term Thread", field: "n_term_thread", minWidth: 80, widthGrow: 0.6, hozAlign: "center" },
+                { title: "Gc", field: "gc", minWidth: 70, widthGrow: 0.8 },
+                { title: "C-Term Thread", field: "c_term_thread", minWidth: 80, widthGrow: 0.6, hozAlign: "center" },
+                { title: "i", field: "i", minWidth: 50, widthGrow: 0.5, hozAlign: "right" },
+                { title: "j", field: "j", minWidth: 50, widthGrow: 0.5, hozAlign: "right" },
+                { title: "NC", field: "nc", minWidth: 120, widthGrow: 1 },
+                { title: "NC (w/buffer)", field: "nc_wbuff", minWidth: 150, widthGrow: 1 },
+                { title: "NC Region", field: "nc_region", minWidth: 150, widthGrow: 1 },
+                { title: "Crossings", field: "crossings", minWidth: 100, widthGrow: 1 },
+                { title: "Crossings (w/buffer)", field: "crossings_wbuff", minWidth: 150, widthGrow: 1 },
+                { title: "Crossings Region", field: "crossings_region", minWidth: 150, widthGrow: 1 },
+                { title: "ENT Region", field: "ent_region", minWidth: 150, widthGrow: 1 },
+                { title: "Loop Size", field: "loopsize", minWidth: 80, widthGrow: 0.6, hozAlign: "right" },
+                { title: "Num Zipper NC", field: "num_zipper_nc", minWidth: 80, widthGrow: 0.6, hozAlign: "right" },
+                { title: "% BB Loop", field: "perc_bb_loop", minWidth: 80, widthGrow: 0.8 },
+                { title: "Loop Contact Res", field: "num_loop_contacting_res", minWidth: 80, widthGrow: 0.7, hozAlign: "right" },
+                { title: "Cross Nearest Neighbors", field: "num_cross_nearest_neighbors", minWidth: 100, widthGrow: 0.7, hozAlign: "right" },
+                { title: "ENT Coverage", field: "ent_coverage", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min N Prot Depth L", field: "min_n_prot_depth_left", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min N Thread Depth L", field: "min_n_thread_depth_left", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min N Thread Slip L", field: "min_n_thread_slippage_left", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min C Prot Depth R", field: "min_c_prot_depth_right", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min C Thread Depth R", field: "min_c_thread_depth_right", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min C Thread Slip R", field: "min_c_thread_slippage_right", minWidth: 100, widthGrow: 0.8 },
+                { title: "Prot Size", field: "prot_size", minWidth: 80, widthGrow: 0.6, hozAlign: "right" },
+                { title: "ACO", field: "aco", minWidth: 70, widthGrow: 0.7 },
+                { title: "RCO", field: "rco", minWidth: 70, widthGrow: 0.7 },
+                { title: "CC Bond", field: "cc_bond", minWidth: 80, widthGrow: 0.6, formatter: "tickCross", hozAlign: "center" }
+            ];
+
+            try {
+                console.log('Creating Tabulator with', data.length, 'rows and', columns.length, 'columns');
+                featuresTable = new Tabulator("#featuresTable", {
+                    data: data,
+                    columns: columns,
+                    layout: "fitColumns",
+                    pagination: true,
+                    paginationSize: 20,
+                    paginationSizeSelector: [10, 20, 50, 100],
+                    movableColumns: true,
+                    resizableColumns: true,
+                    resizableRows: false,
+                    height: "auto",
+                    tooltips: true
+                });
+                console.log('Tabulator created successfully');
+            } catch (e) {
+                console.error('Error creating Tabulator:', e);
+                throw e;
+            }
+        }
+
         // Download CSV
-        function downloadCSV(data, pdbId) {
-            const headers = ['ID', 'chain', 'i', 'j', 'crossingsN', 'crossingsC', 'gn', 'gc', 'GLNn', 'GLNc', 'TLNn', 'TLNc', 'CCbond', 'ENT'];
-            const rows = data.map(row => [
-                row.ID || '',
-                row.chain,
-                row.i,
-                row.j,
-                row.crossingsN || '',
-                row.crossingsC || '',
-                row.gn,
-                row.gc,
-                row.GLNn,
-                row.GLNc,
-                row.TLNn,
-                row.TLNc,
-                row.CCbond,
-                row.ENT
-            ]);
+        function downloadResults(jobId, jobName) {
+            // Download all results as a zip file
+            const url = `${API_BASE_URL}/api/jobs/${jobId}/download-results`;
             
-            let csvContent = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csvContent += row.join(',') + '\n';
-            });
-            
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${pdbId || 'results'}_entanglement.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
+            fetch(url)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.blob();
+                })
+                .then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${jobName || 'ncle_results'}_${jobId.substring(0, 8)}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                })
+                .catch(error => {
+                    console.error('Download failed:', error);
+                    alert('Failed to download results: ' + error.message);
+                });
         }
 
         // Initialize on page load

@@ -333,6 +333,11 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                 print(f"\n>>> STARTING FEATURE GENERATION <<<", file=sys.stderr)
                 print(f"Generating entanglement features for {uniprot_id}", file=sys.stderr)
                 
+                # DEBUG: Check EntDetect version
+                import EntDetect
+                log_file.write(f"EntDetect being used: {EntDetect.__file__}\n")
+                log_file.flush()
+                
                 clustered_file_path = os.path.join(temp_dir, f'combined_clustered_{pdb_id}.csv')
                 result['clustered_data'].to_csv(clustered_file_path, sep='|', index=False)
                 
@@ -371,14 +376,22 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                                 # Read features CSV
                                 features_df = pd.read_csv(features_file, sep='|')
                                 all_features_dfs.append(features_df)
-                                # DEBUG: Copy CSV to keep it for inspection
-                                debug_csv_path = f"/tmp/debug_features_{chain if chain else 'default'}.csv"
+                                # DEBUG: Copy CSV to keep it for inspection and log details
                                 import shutil
+                                debug_csv_path = f"/tmp/debug_features_{chain if chain else 'default'}.csv"
                                 shutil.copy(features_file, debug_csv_path)
                                 log_file.write(f"    ✓ Loaded {len(features_df)} features from CSV (copied to {debug_csv_path})\n")
-                                log_file.write(f"    Columns: {list(features_df.columns)}\n")
+                                log_file.write(f"    CSV separator appears to be: pipe (|)\n")
+                                log_file.write(f"    Columns in CSV: {list(features_df.columns)}\n")
+                                log_file.write(f"    DataFrame dtypes:\n")
+                                for col in ['crossingsN', 'crossingsC', 'N_term_thread', 'C_term_thread']:
+                                    if col in features_df.columns:
+                                        log_file.write(f"      {col}: {features_df[col].dtype}\n")
                                 if len(features_df) > 0:
-                                    log_file.write(f"    First row: ENT-ID={features_df.iloc[0].get('ENT-ID')}, N_term={features_df.iloc[0].get('N_term_thread')}, C_term={features_df.iloc[0].get('C_term_thread')}, crossingsN={features_df.iloc[0].get('crossingsN')}, crossingsC={features_df.iloc[0].get('crossingsC')}\n")
+                                    log_file.write(f"    First row values:\n")
+                                    for col in ['ENT-ID', 'N_term_thread', 'C_term_thread', 'crossingsN', 'crossingsC']:
+                                        val = features_df.iloc[0].get(col, 'MISSING')
+                                        log_file.write(f"      {col}: {val} (type: {type(val).__name__})\n")
                                 log_file.flush()
                                 print(f"Generated features for chain {chain if chain else 'default'}: {len(features_df)} features")
                             else:
@@ -396,6 +409,13 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                     combined_features_df = pd.concat(all_features_dfs, ignore_index=True)
                     result['features_data'] = combined_features_df
                     log_file.write(f"SUCCESS: Combined {len(combined_features_df)} features from {len(all_features_dfs)} chain(s)\n")
+                    log_file.write(f"  Combined DF shape: {combined_features_df.shape}\n")
+                    log_file.write(f"  Combined DF columns: {list(combined_features_df.columns)}\n")
+                    log_file.write(f"  First row of combined DF:\n")
+                    if len(combined_features_df) > 0:
+                        for col in ['ENT-ID', 'N_term_thread', 'C_term_thread', 'crossingsN', 'crossingsC']:
+                            val = combined_features_df.iloc[0].get(col, 'MISSING')
+                            log_file.write(f"    {col}: {val} (type: {type(val).__name__})\n")
                     log_file.flush()
                     print(f"Combined features: {len(combined_features_df)} total features from {len(all_features_dfs)} chain(s)")
                 else:

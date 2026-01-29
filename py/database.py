@@ -564,49 +564,56 @@ class Database:
                     return s in ['true', '1', 'yes']
                 
                 # Handle both old and new column name formats
-                # Old format (EntDetect 1.0): crossings, crossings_wbuff, crossings_region
+                # Old format (EntDetect 1.0): crossings, crossings_wbuff, crossings_region (single column for both terminals)
                 # New format (EntDetect 1.1+): crossingsN, crossingsC, crossingsN_wbuff, crossingsC_wbuff, crossingsN_region, crossingsC_region
+                # For old format, map to appropriate terminal based on which thread exists
+                n_term_thread = safe_int(row.get('N_term_thread', 0))
+                c_term_thread = safe_int(row.get('C_term_thread', 0))
+                old_crossings = row.get('crossings')
+                old_crossings_wbuff = row.get('crossings_wbuff')
+                old_crossings_region = row.get('crossings_region')
+                
                 crossingsN = row.get('crossingsN')
                 if pd.isna(crossingsN) or crossingsN == '':
-                    # Try old format for N-terminal
-                    if 'crossings' in row and not pd.isna(row.get('crossings')):
-                        crossingsN = row.get('crossings')
+                    # For old format, only use 'crossings' if N-terminal thread exists
+                    if n_term_thread and 'crossings' in row and not pd.isna(old_crossings):
+                        crossingsN = old_crossings
                     else:
                         crossingsN = None
                 
                 crossingsC = row.get('crossingsC')
                 if pd.isna(crossingsC) or crossingsC == '':
-                    # Try old format for C-terminal (fall back to crossings if not specified)
-                    if 'crossings' in row and not pd.isna(row.get('crossings')):
-                        crossingsC = row.get('crossings')
+                    # For old format, only use 'crossings' if C-terminal thread exists
+                    if c_term_thread and 'crossings' in row and not pd.isna(old_crossings):
+                        crossingsC = old_crossings
                     else:
                         crossingsC = None
                 
                 crossingsN_wbuff = row.get('crossingsN_wbuff')
                 if pd.isna(crossingsN_wbuff) or crossingsN_wbuff == '':
-                    if 'crossings_wbuff' in row and not pd.isna(row.get('crossings_wbuff')):
-                        crossingsN_wbuff = row.get('crossings_wbuff')
+                    if n_term_thread and 'crossings_wbuff' in row and not pd.isna(old_crossings_wbuff):
+                        crossingsN_wbuff = old_crossings_wbuff
                     else:
                         crossingsN_wbuff = None
                 
                 crossingsC_wbuff = row.get('crossingsC_wbuff')
                 if pd.isna(crossingsC_wbuff) or crossingsC_wbuff == '':
-                    if 'crossings_wbuff' in row and not pd.isna(row.get('crossings_wbuff')):
-                        crossingsC_wbuff = row.get('crossings_wbuff')
+                    if c_term_thread and 'crossings_wbuff' in row and not pd.isna(old_crossings_wbuff):
+                        crossingsC_wbuff = old_crossings_wbuff
                     else:
                         crossingsC_wbuff = None
                 
                 crossingsN_region = row.get('crossingsN_region')
                 if pd.isna(crossingsN_region) or crossingsN_region == '':
-                    if 'crossings_region' in row and not pd.isna(row.get('crossings_region')):
-                        crossingsN_region = row.get('crossings_region')
+                    if n_term_thread and 'crossings_region' in row and not pd.isna(old_crossings_region):
+                        crossingsN_region = old_crossings_region
                     else:
                         crossingsN_region = None
                 
                 crossingsC_region = row.get('crossingsC_region')
                 if pd.isna(crossingsC_region) or crossingsC_region == '':
-                    if 'crossings_region' in row and not pd.isna(row.get('crossings_region')):
-                        crossingsC_region = row.get('crossings_region')
+                    if c_term_thread and 'crossings_region' in row and not pd.isna(old_crossings_region):
+                        crossingsC_region = old_crossings_region
                     else:
                         crossingsC_region = None
 

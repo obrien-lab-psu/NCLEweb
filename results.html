@@ -1273,6 +1273,8 @@
 
             try {
                 console.log('Creating Tabulator with', data.length, 'rows');
+                console.log('First data row keys:', Object.keys(data[0]));
+                console.log('Sample column definitions:', columns.slice(0, 3));
                 
                 // Create table with minimal config first
                 featuresTable = new Tabulator("#featuresTable", {
@@ -1300,10 +1302,18 @@
                     console.log('  Original data passed:', data.length, 'rows');
                     if (data.length > 0) {
                         console.log('  First row of input data:', data[0]);
+                        console.log('  Data row keys:', Object.keys(data[0]));
                     }
+                    
+                    // Try to manually set data as fallback
+                    console.log('⚠️  Attempting to set data manually...');
+                    featuresTable.setData(data);
+                    const tableData2 = featuresTable.getData();
+                    console.log('✓ After setData(), table has', tableData2.length, 'rows');
                 }
             } catch (e) {
                 console.error('✗ Error creating Tabulator:', e);
+                console.error('  Error message:', e.message);
                 console.error('  Stack:', e.stack);
                 throw e;
             }

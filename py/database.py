@@ -622,6 +622,27 @@ class Database:
                         crossingsC_region = old_crossings_region
                     else:
                         crossingsC_region = None
+                
+                # FIX: EntDetect may assign crossings to wrong column based on GaussianEntanglement output
+                # If N-terminal thread exists and has crossings in C column (but not N), swap them
+                if n_term_thread and not c_term_thread:
+                    crossingsN_val = safe_str(crossingsN) if not pd.isna(crossingsN) else None
+                    crossingsC_val = safe_str(crossingsC) if not pd.isna(crossingsC) else None
+                    # If C has value but N is empty, swap them
+                    if (not crossingsN_val or crossingsN_val == 'None') and crossingsC_val and crossingsC_val != 'None':
+                        crossingsN, crossingsC = crossingsC, crossingsN
+                        crossingsN_wbuff, crossingsC_wbuff = crossingsC_wbuff, crossingsN_wbuff
+                        crossingsN_region, crossingsC_region = crossingsC_region, crossingsN_region
+                
+                # If C-terminal thread exists and has crossings in N column (but not C), swap them
+                elif c_term_thread and not n_term_thread:
+                    crossingsN_val = safe_str(crossingsN) if not pd.isna(crossingsN) else None
+                    crossingsC_val = safe_str(crossingsC) if not pd.isna(crossingsC) else None
+                    # If N has value but C is empty, swap them
+                    if (not crossingsC_val or crossingsC_val == 'None') and crossingsN_val and crossingsN_val != 'None':
+                        crossingsN, crossingsC = crossingsC, crossingsN
+                        crossingsN_wbuff, crossingsC_wbuff = crossingsC_wbuff, crossingsN_wbuff
+                        crossingsN_region, crossingsC_region = crossingsC_region, crossingsN_region
 
                 feature = EntanglementFeature(
                     job_id=job_id,

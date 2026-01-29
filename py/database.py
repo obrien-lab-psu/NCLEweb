@@ -563,6 +563,53 @@ class Database:
                     s = str(val).lower().strip()
                     return s in ['true', '1', 'yes']
                 
+                # Handle both old and new column name formats
+                # Old format (EntDetect 1.0): crossings, crossings_wbuff, crossings_region
+                # New format (EntDetect 1.1+): crossingsN, crossingsC, crossingsN_wbuff, crossingsC_wbuff, crossingsN_region, crossingsC_region
+                crossingsN = row.get('crossingsN')
+                if pd.isna(crossingsN) or crossingsN == '':
+                    # Try old format for N-terminal
+                    if 'crossings' in row and not pd.isna(row.get('crossings')):
+                        crossingsN = row.get('crossings')
+                    else:
+                        crossingsN = None
+                
+                crossingsC = row.get('crossingsC')
+                if pd.isna(crossingsC) or crossingsC == '':
+                    # Try old format for C-terminal (fall back to crossings if not specified)
+                    if 'crossings' in row and not pd.isna(row.get('crossings')):
+                        crossingsC = row.get('crossings')
+                    else:
+                        crossingsC = None
+                
+                crossingsN_wbuff = row.get('crossingsN_wbuff')
+                if pd.isna(crossingsN_wbuff) or crossingsN_wbuff == '':
+                    if 'crossings_wbuff' in row and not pd.isna(row.get('crossings_wbuff')):
+                        crossingsN_wbuff = row.get('crossings_wbuff')
+                    else:
+                        crossingsN_wbuff = None
+                
+                crossingsC_wbuff = row.get('crossingsC_wbuff')
+                if pd.isna(crossingsC_wbuff) or crossingsC_wbuff == '':
+                    if 'crossings_wbuff' in row and not pd.isna(row.get('crossings_wbuff')):
+                        crossingsC_wbuff = row.get('crossings_wbuff')
+                    else:
+                        crossingsC_wbuff = None
+                
+                crossingsN_region = row.get('crossingsN_region')
+                if pd.isna(crossingsN_region) or crossingsN_region == '':
+                    if 'crossings_region' in row and not pd.isna(row.get('crossings_region')):
+                        crossingsN_region = row.get('crossings_region')
+                    else:
+                        crossingsN_region = None
+                
+                crossingsC_region = row.get('crossingsC_region')
+                if pd.isna(crossingsC_region) or crossingsC_region == '':
+                    if 'crossings_region' in row and not pd.isna(row.get('crossings_region')):
+                        crossingsC_region = row.get('crossings_region')
+                    else:
+                        crossingsC_region = None
+
                 feature = EntanglementFeature(
                     job_id=job_id,
                     gene=safe_str(row.get('gene', '')),
@@ -578,12 +625,12 @@ class Database:
                     NC=safe_str(row.get('NC')),
                     NC_wbuff=safe_str(row.get('NC_wbuff')),
                     NC_region=safe_str(row.get('NC_region')),
-                    crossingsN=safe_str(row.get('crossingsN')),
-                    crossingsC=safe_str(row.get('crossingsC')),
-                    crossingsN_wbuff=safe_str(row.get('crossingsN_wbuff')),
-                    crossingsC_wbuff=safe_str(row.get('crossingsC_wbuff')),
-                    crossingsN_region=safe_str(row.get('crossingsN_region')),
-                    crossingsC_region=safe_str(row.get('crossingsC_region')),
+                    crossingsN=safe_str(crossingsN),
+                    crossingsC=safe_str(crossingsC),
+                    crossingsN_wbuff=safe_str(crossingsN_wbuff),
+                    crossingsC_wbuff=safe_str(crossingsC_wbuff),
+                    crossingsN_region=safe_str(crossingsN_region),
+                    crossingsC_region=safe_str(crossingsC_region),
                     ent_region=safe_str(row.get('ent_region')),
                     loopsize=safe_int(row.get('loopsize')),
                     num_zipper_nc=safe_int(row.get('num_zipper_nc')),

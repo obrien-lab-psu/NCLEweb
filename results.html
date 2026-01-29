@@ -371,13 +371,30 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}`);
+                const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}?t=${Date.now()}`);
                 
                 if (!response.ok) {
                     throw new Error(`Failed to load job data: ${response.statusText}`);
                 }
 
                 jobData = await response.json();
+                
+                console.log('=== RAW API RESPONSE ===');
+                console.log('features_data exists:', !!jobData.features_data);
+                console.log('features_data length:', jobData.features_data ? jobData.features_data.length : 'undefined');
+                
+                if (jobData.features_data && jobData.features_data.length > 0) {
+                    const f = jobData.features_data[0];
+                    console.log('\n⚠️ FIRST FEATURE FROM API (raw):\n');
+                    console.log('  crossingsN:', f.crossingsN);
+                    console.log('  crossingsC:', f.crossingsC);
+                    console.log('  crossingsN_wbuff:', f.crossingsN_wbuff);
+                    console.log('  crossingsC_wbuff:', f.crossingsC_wbuff);
+                    console.log('  crossingsN_region:', f.crossingsN_region);
+                    console.log('  crossingsC_region:', f.crossingsC_region);
+                    console.log('\n  All keys in first feature:', Object.keys(f));
+                }
+                
                 displayJobData(jobData);
                 
             } catch (error) {
@@ -496,8 +513,17 @@
             renderClusteredTable(clusteredResults);
             
             // Load entanglement features if available
+            console.log('Checking for features...');
+            console.log('  data.generate_features:', data.generate_features);
+            console.log('  data.features_data:', data.features_data);
+            console.log('  features_data type:', typeof data.features_data);
+            console.log('  features_data length:', data.features_data ? data.features_data.length : 'undefined');
+            
             if (data.generate_features) {
+                console.log('✓ Loading entanglement features');
                 loadEntanglementFeatures(data.features_data || []);
+            } else {
+                console.log('✗ generate_features is false or not set');
             }
             
             // Load structure into NGL viewer if PDB content is available
@@ -1142,7 +1168,11 @@
         // Load and render entanglement features
         function loadEntanglementFeatures(features) {
             try {
+                console.log('loadEntanglementFeatures called with:', features);
+                console.log('Features length:', features ? features.length : 'undefined');
+                
                 if (!features || features.length === 0) {
+                    console.log('No features provided');
                     document.getElementById('noFeatures').style.display = 'block';
                     document.getElementById('featuresTable').style.display = 'none';
                     // Show the toggle if features were requested but none found
@@ -1151,6 +1181,7 @@
                     return;
                 }
                 
+                console.log('Features found, rendering table...');
                 // Show features section, toggle, and table
                 document.getElementById('featuresToggleLabel').style.display = 'flex';
                 document.getElementById('featuresSection').style.display = 'block';
@@ -1175,11 +1206,18 @@
 
         // Render entanglement features table
         function renderFeaturesTable(data) {
-            console.log('renderFeaturesTable called with', data.length, 'rows');
+            console.log('=== renderFeaturesTable START ===');
+            console.log('Data rows:', data.length);
             if (data.length > 0) {
-                console.log('First row full data:', data[0]);
-                console.log('  gn field:', data[0].gn);
-                console.log('  gc field:', data[0].gc);
+                const first = data[0];
+                console.log('First row keys:', Object.keys(first));
+                console.log('First row - crossing fields:');
+                console.log('  crossingsN:', first.crossingsN);
+                console.log('  crossingsC:', first.crossingsC);
+                console.log('  crossingsN_wbuff:', first.crossingsN_wbuff);
+                console.log('  crossingsC_wbuff:', first.crossingsC_wbuff);
+                console.log('  crossingsN_region:', first.crossingsN_region);
+                console.log('  crossingsC_region:', first.crossingsC_region);
             }
             
             // Destroy existing table if it exists
@@ -1194,21 +1232,24 @@
             
             const columns = [
                 { title: "Gene", field: "gene", minWidth: 80, widthGrow: 1 },
-                { title: "PDB", field: "pdb", minWidth: 100, widthGrow: 1 },
+                { title: "PDB", field: "PDB", minWidth: 100, widthGrow: 1 },
                 { title: "Chain", field: "chain", minWidth: 60, widthGrow: 0.5 },
-                { title: "ENT-ID", field: "ent_id", minWidth: 70, widthGrow: 0.5, hozAlign: "center" },
+                { title: "ENT-ID", field: "ENT_ID", minWidth: 70, widthGrow: 0.5, hozAlign: "center" },
                 { title: "Gn", field: "gn", minWidth: 70, widthGrow: 0.8 },
-                { title: "N-Term Thread", field: "n_term_thread", minWidth: 80, widthGrow: 0.6, hozAlign: "center" },
+                { title: "N-Term Thread", field: "N_term_thread", minWidth: 80, widthGrow: 0.6, hozAlign: "center" },
                 { title: "Gc", field: "gc", minWidth: 70, widthGrow: 0.8 },
-                { title: "C-Term Thread", field: "c_term_thread", minWidth: 80, widthGrow: 0.6, hozAlign: "center" },
+                { title: "C-Term Thread", field: "C_term_thread", minWidth: 80, widthGrow: 0.6, hozAlign: "center" },
                 { title: "i", field: "i", minWidth: 50, widthGrow: 0.5, hozAlign: "right" },
                 { title: "j", field: "j", minWidth: 50, widthGrow: 0.5, hozAlign: "right" },
-                { title: "NC", field: "nc", minWidth: 120, widthGrow: 1 },
-                { title: "NC (w/buffer)", field: "nc_wbuff", minWidth: 150, widthGrow: 1 },
-                { title: "NC Region", field: "nc_region", minWidth: 150, widthGrow: 1 },
-                { title: "Crossings", field: "crossings", minWidth: 100, widthGrow: 1 },
-                { title: "Crossings (w/buffer)", field: "crossings_wbuff", minWidth: 150, widthGrow: 1 },
-                { title: "Crossings Region", field: "crossings_region", minWidth: 150, widthGrow: 1 },
+                { title: "NC", field: "NC", minWidth: 120, widthGrow: 1 },
+                { title: "NC (w/buffer)", field: "NC_wbuff", minWidth: 150, widthGrow: 1 },
+                { title: "NC Region", field: "NC_region", minWidth: 150, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 100, widthGrow: 1 },
+                { title: "Crossings C", field: "crossingsC", minWidth: 100, widthGrow: 1 },
+                { title: "Crossings N (w/buffer)", field: "crossingsN_wbuff", minWidth: 150, widthGrow: 1 },
+                { title: "Crossings C (w/buffer)", field: "crossingsC_wbuff", minWidth: 150, widthGrow: 1 },
+                { title: "Crossings N Region", field: "crossingsN_region", minWidth: 150, widthGrow: 1 },
+                { title: "Crossings C Region", field: "crossingsC_region", minWidth: 150, widthGrow: 1 },
                 { title: "ENT Region", field: "ent_region", minWidth: 150, widthGrow: 1 },
                 { title: "Loop Size", field: "loopsize", minWidth: 80, widthGrow: 0.6, hozAlign: "right" },
                 { title: "Num Zipper NC", field: "num_zipper_nc", minWidth: 80, widthGrow: 0.6, hozAlign: "right" },
@@ -1216,20 +1257,24 @@
                 { title: "Loop Contact Res", field: "num_loop_contacting_res", minWidth: 80, widthGrow: 0.7, hozAlign: "right" },
                 { title: "Cross Nearest Neighbors", field: "num_cross_nearest_neighbors", minWidth: 100, widthGrow: 0.7, hozAlign: "right" },
                 { title: "ENT Coverage", field: "ent_coverage", minWidth: 100, widthGrow: 0.8 },
-                { title: "Min N Prot Depth L", field: "min_n_prot_depth_left", minWidth: 100, widthGrow: 0.8 },
-                { title: "Min N Thread Depth L", field: "min_n_thread_depth_left", minWidth: 100, widthGrow: 0.8 },
-                { title: "Min N Thread Slip L", field: "min_n_thread_slippage_left", minWidth: 100, widthGrow: 0.8 },
-                { title: "Min C Prot Depth R", field: "min_c_prot_depth_right", minWidth: 100, widthGrow: 0.8 },
-                { title: "Min C Thread Depth R", field: "min_c_thread_depth_right", minWidth: 100, widthGrow: 0.8 },
-                { title: "Min C Thread Slip R", field: "min_c_thread_slippage_right", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min N Prot Depth L", field: "min_N_prot_depth_left", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min N Thread Depth L", field: "min_N_thread_depth_left", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min N Thread Slip L", field: "min_N_thread_slippage_left", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min C Prot Depth R", field: "min_C_prot_depth_right", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min C Thread Depth R", field: "min_C_thread_depth_right", minWidth: 100, widthGrow: 0.8 },
+                { title: "Min C Thread Slip R", field: "min_C_thread_slippage_right", minWidth: 100, widthGrow: 0.8 },
                 { title: "Prot Size", field: "prot_size", minWidth: 80, widthGrow: 0.6, hozAlign: "right" },
-                { title: "ACO", field: "aco", minWidth: 70, widthGrow: 0.7 },
-                { title: "RCO", field: "rco", minWidth: 70, widthGrow: 0.7 },
-                { title: "CC Bond", field: "cc_bond", minWidth: 80, widthGrow: 0.6, formatter: "tickCross", hozAlign: "center" }
+                { title: "ACO", field: "ACO", minWidth: 70, widthGrow: 0.7 },
+                { title: "RCO", field: "RCO", minWidth: 70, widthGrow: 0.7 },
+                { title: "CC Bond", field: "CCBond", minWidth: 80, widthGrow: 0.6, formatter: "tickCross", hozAlign: "center" }
             ];
 
+            console.log('Columns to render:', columns.length);
+
             try {
-                console.log('Creating Tabulator with', data.length, 'rows and', columns.length, 'columns');
+                console.log('Creating Tabulator with', data.length, 'rows');
+                
+                // Create table with minimal config first
                 featuresTable = new Tabulator("#featuresTable", {
                     data: data,
                     columns: columns,
@@ -1243,9 +1288,23 @@
                     height: "auto",
                     tooltips: true
                 });
-                console.log('Tabulator created successfully');
+                
+                console.log('✓ Tabulator instance created');
+                const tableData = featuresTable.getData();
+                console.log('✓ Table getData() returned', tableData.length, 'rows');
+                
+                if (tableData.length > 0) {
+                    console.log('✓ First row in table:', tableData[0]);
+                } else {
+                    console.log('✗ Table has no rows! Data was not added.');
+                    console.log('  Original data passed:', data.length, 'rows');
+                    if (data.length > 0) {
+                        console.log('  First row of input data:', data[0]);
+                    }
+                }
             } catch (e) {
-                console.error('Error creating Tabulator:', e);
+                console.error('✗ Error creating Tabulator:', e);
+                console.error('  Stack:', e.stack);
                 throw e;
             }
         }

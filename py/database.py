@@ -222,27 +222,46 @@ class ClusteredResult(Base):
 
 
 class EntanglementFeature(Base):
-    """Entanglement features table (Native_clustered_HQ_GE_features)"""
+    """Entanglement features table (Native_clustered_HQ_GE_features)
+    
+    Updated for EntDetect 0.2.0+ with new column names:
+    - pdb -> PDB
+    - ent_id -> ENT-ID
+    - n_term_thread -> N_term_thread
+    - c_term_thread -> C_term_thread
+    - nc -> NC
+    - nc_wbuff -> NC_wbuff
+    - nc_region -> NC_region
+    - crossings -> split into crossingsN, crossingsC, crossingsN_wbuff, etc.
+    - min_n_* -> min_N_*
+    - min_c_* -> min_C_*
+    - aco -> ACO
+    - rco -> RCO
+    - cc_bond -> CCBond
+    """
     __tablename__ = 'entanglement_features'
     
     feature_id = Column(Integer, primary_key=True, autoincrement=True)
     job_id = Column(String, ForeignKey('jobs.job_id'), nullable=False, index=True)
     gene = Column(String, nullable=False)  # UniProt gene name
-    pdb = Column(String, nullable=False)  # PDB/Structure ID
+    PDB = Column(String, nullable=False)  # PDB/Structure ID
     chain = Column(String, nullable=False)
-    ent_id = Column(Integer, nullable=False)  # Entanglement ID
+    ENT_ID = Column(Integer, nullable=False)  # Entanglement ID (note: using ENT_ID in DB to avoid dash)
     gn = Column(Float)  # Gaussian linking number N-terminal
-    n_term_thread = Column(Integer)  # N-terminal threading
+    N_term_thread = Column(Integer)  # N-terminal threading
     gc = Column(Float)  # Gaussian linking number C-terminal
-    c_term_thread = Column(Integer)  # C-terminal threading
+    C_term_thread = Column(Integer)  # C-terminal threading
     i = Column(Integer)  # Residue index i
     j = Column(Integer)  # Residue index j
-    nc = Column(String)  # Native contacts (i,j)
-    nc_wbuff = Column(String)  # Native contacts with buffer
-    nc_region = Column(String)  # NC region
-    crossings = Column(String)  # Crossing number
-    crossings_wbuff = Column(String)  # Crossings with buffer
-    crossings_region = Column(String)  # Crossings region
+    NC = Column(String)  # Native contacts (i,j)
+    NC_wbuff = Column(String)  # Native contacts with buffer
+    NC_region = Column(String)  # NC region
+    crossingsN = Column(String)  # N-terminal crossing residues
+    crossingsC = Column(String)  # C-terminal crossing residues
+    crossingsN_wbuff = Column(String)  # N-terminal crossings with buffer
+    crossingsC_wbuff = Column(String)  # C-terminal crossings with buffer
+    crossingsN_region = Column(String)  # N-terminal crossings region
+    crossingsC_region = Column(String)  # C-terminal crossings region
     ent_region = Column(String)  # Entanglement region
     loopsize = Column(Integer)  # Loop size
     num_zipper_nc = Column(Integer)  # Number of zipper contacts
@@ -250,16 +269,16 @@ class EntanglementFeature(Base):
     num_loop_contacting_res = Column(Integer)  # Number of loop contacting residues
     num_cross_nearest_neighbors = Column(Integer)  # Number of crossing nearest neighbors
     ent_coverage = Column(Float)  # Entanglement coverage
-    min_n_prot_depth_left = Column(Float)  # Min N protein depth left
-    min_n_thread_depth_left = Column(Float)  # Min N thread depth left
-    min_n_thread_slippage_left = Column(Float)  # Min N thread slippage left
-    min_c_prot_depth_right = Column(Float)  # Min C protein depth right
-    min_c_thread_depth_right = Column(Float)  # Min C thread depth right
-    min_c_thread_slippage_right = Column(Float)  # Min C thread slippage right
+    min_N_prot_depth_left = Column(Float)  # Min N protein depth left
+    min_N_thread_depth_left = Column(Float)  # Min N thread depth left
+    min_N_thread_slippage_left = Column(Float)  # Min N thread slippage left
+    min_C_prot_depth_right = Column(Float)  # Min C protein depth right
+    min_C_thread_depth_right = Column(Float)  # Min C thread depth right
+    min_C_thread_slippage_right = Column(Float)  # Min C thread slippage right
     prot_size = Column(Integer)  # Protein size
-    aco = Column(Float)  # ACO metric
-    rco = Column(Float)  # RCO metric
-    cc_bond = Column(Boolean)  # Cysteine-cysteine bond
+    ACO = Column(Float)  # ACO metric
+    RCO = Column(Float)  # RCO metric
+    CCBond = Column(Boolean)  # Cysteine-cysteine bond
     
     def to_dict(self):
         """Convert to dictionary for JSON serialization"""
@@ -267,21 +286,24 @@ class EntanglementFeature(Base):
             'feature_id': self.feature_id,
             'job_id': self.job_id,
             'gene': self.gene,
-            'pdb': self.pdb,
+            'PDB': self.PDB,
             'chain': self.chain,
-            'ent_id': self.ent_id,
+            'ENT_ID': self.ENT_ID,
             'gn': self.gn,
-            'n_term_thread': self.n_term_thread,
+            'N_term_thread': self.N_term_thread,
             'gc': self.gc,
-            'c_term_thread': self.c_term_thread,
+            'C_term_thread': self.C_term_thread,
             'i': self.i,
             'j': self.j,
-            'nc': self.nc,
-            'nc_wbuff': self.nc_wbuff,
-            'nc_region': self.nc_region,
-            'crossings': self.crossings,
-            'crossings_wbuff': self.crossings_wbuff,
-            'crossings_region': self.crossings_region,
+            'NC': self.NC,
+            'NC_wbuff': self.NC_wbuff,
+            'NC_region': self.NC_region,
+            'crossingsN': self.crossingsN,
+            'crossingsC': self.crossingsC,
+            'crossingsN_wbuff': self.crossingsN_wbuff,
+            'crossingsC_wbuff': self.crossingsC_wbuff,
+            'crossingsN_region': self.crossingsN_region,
+            'crossingsC_region': self.crossingsC_region,
             'ent_region': self.ent_region,
             'loopsize': self.loopsize,
             'num_zipper_nc': self.num_zipper_nc,
@@ -289,16 +311,16 @@ class EntanglementFeature(Base):
             'num_loop_contacting_res': self.num_loop_contacting_res,
             'num_cross_nearest_neighbors': self.num_cross_nearest_neighbors,
             'ent_coverage': self.ent_coverage,
-            'min_n_prot_depth_left': self.min_n_prot_depth_left,
-            'min_n_thread_depth_left': self.min_n_thread_depth_left,
-            'min_n_thread_slippage_left': self.min_n_thread_slippage_left,
-            'min_c_prot_depth_right': self.min_c_prot_depth_right,
-            'min_c_thread_depth_right': self.min_c_thread_depth_right,
-            'min_c_thread_slippage_right': self.min_c_thread_slippage_right,
+            'min_N_prot_depth_left': self.min_N_prot_depth_left,
+            'min_N_thread_depth_left': self.min_N_thread_depth_left,
+            'min_N_thread_slippage_left': self.min_N_thread_slippage_left,
+            'min_C_prot_depth_right': self.min_C_prot_depth_right,
+            'min_C_thread_depth_right': self.min_C_thread_depth_right,
+            'min_C_thread_slippage_right': self.min_C_thread_slippage_right,
             'prot_size': self.prot_size,
-            'aco': self.aco,
-            'rco': self.rco,
-            'cc_bond': self.cc_bond
+            'ACO': self.ACO,
+            'RCO': self.RCO,
+            'CCBond': self.CCBond
         }
 
 
@@ -487,49 +509,98 @@ class Database:
             session.close()
     
     def save_entanglement_features(self, job_id, features_df):
-        """Save entanglement features for a job (Native_clustered_HQ_GE_features)"""
+        """Save entanglement features for a job (Native_clustered_HQ_GE_features)
+        
+        Handles EntDetect 1.1.1+ column names:
+        - PDB, ENT-ID, N_term_thread, C_term_thread, NC, NC_wbuff, NC_region
+        - crossingsN, crossingsC, crossingsN_wbuff, crossingsC_wbuff, crossingsN_region, crossingsC_region
+        - min_N_prot_depth_left, min_C_prot_depth_right, ACO, RCO, CCBond
+        
+        Properly handles NaN/None values from pandas DataFrames.
+        """
+        import pandas as pd
+        import numpy as np
+        
         session = self.get_session()
         try:
             for idx, (_, row) in enumerate(features_df.iterrows()):
-                if idx == 0:
-                    print(f"DEBUG: First row raw data: {dict(row)}")
-                    print(f"DEBUG: gn={row.get('gn')}, gc={row.get('gc')}, n_term_thread={row.get('N_term_thread')}")
+                # Helper function to safely convert values, handling NaN
+                def safe_float(val):
+                    if pd.isna(val):
+                        return None
+                    try:
+                        return float(val) if val != '' else None
+                    except (ValueError, TypeError):
+                        return None
+                
+                def safe_int(val):
+                    if pd.isna(val):
+                        return None
+                    try:
+                        return int(float(val)) if val != '' else None
+                    except (ValueError, TypeError):
+                        return None
+                
+                def safe_str(val):
+                    """Convert values to string, handling NaN and numeric values"""
+                    if pd.isna(val):
+                        return None
+                    if isinstance(val, float) and np.isnan(val):
+                        return None
+                    s = str(val).strip()
+                    if not s or s.lower() == 'nan':
+                        return None
+                    # Remove trailing .0 for numeric strings that are actually integers
+                    if s.endswith('.0') and s[:-2].replace('-', '').isdigit():
+                        s = s[:-2]
+                    return s if s else None
+                
+                def safe_bool(val):
+                    if pd.isna(val):
+                        return False
+                    if isinstance(val, bool):
+                        return val
+                    s = str(val).lower().strip()
+                    return s in ['true', '1', 'yes']
                 
                 feature = EntanglementFeature(
                     job_id=job_id,
-                    gene=str(row.get('gene', '')),
-                    pdb=str(row.get('PDB', '')),
-                    chain=str(row.get('chain', '')),
-                    ent_id=int(row.get('ENT-ID', 0)),
-                    gn=float(row.get('gn', 0)) if row.get('gn') else None,
-                    n_term_thread=int(row.get('N_term_thread', 0)) if row.get('N_term_thread') else None,
-                    gc=float(row.get('gc', 0)) if row.get('gc') else None,
-                    c_term_thread=int(row.get('C_term_thread', 0)) if row.get('C_term_thread') else None,
-                    i=int(row.get('i', 0)) if row.get('i') else None,
-                    j=int(row.get('j', 0)) if row.get('j') else None,
-                    nc=str(row.get('NC', '')) if row.get('NC') else None,
-                    nc_wbuff=str(row.get('NC_wbuff', '')) if row.get('NC_wbuff') else None,
-                    nc_region=str(row.get('NC_region', '')) if row.get('NC_region') else None,
-                    crossings=str(row.get('crossings', '')) if row.get('crossings') else None,
-                    crossings_wbuff=str(row.get('crossings_wbuff', '')) if row.get('crossings_wbuff') else None,
-                    crossings_region=str(row.get('crossings_region', '')) if row.get('crossings_region') else None,
-                    ent_region=str(row.get('ent_region', '')) if row.get('ent_region') else None,
-                    loopsize=int(row.get('loopsize', 0)) if row.get('loopsize') else None,
-                    num_zipper_nc=int(row.get('num_zipper_nc', 0)) if row.get('num_zipper_nc') else None,
-                    perc_bb_loop=float(row.get('perc_bb_loop', 0)) if row.get('perc_bb_loop') else None,
-                    num_loop_contacting_res=int(row.get('num_loop_contacting_res', 0)) if row.get('num_loop_contacting_res') else None,
-                    num_cross_nearest_neighbors=int(row.get('num_cross_nearest_neighbors', 0)) if row.get('num_cross_nearest_neighbors') else None,
-                    ent_coverage=float(row.get('ent_coverage', 0)) if row.get('ent_coverage') else None,
-                    min_n_prot_depth_left=float(row.get('min_N_prot_depth_left', 0)) if row.get('min_N_prot_depth_left') else None,
-                    min_n_thread_depth_left=float(row.get('min_N_thread_depth_left', 0)) if row.get('min_N_thread_depth_left') else None,
-                    min_n_thread_slippage_left=float(row.get('min_N_thread_slippage_left', 0)) if row.get('min_N_thread_slippage_left') else None,
-                    min_c_prot_depth_right=float(row.get('min_C_prot_depth_right', 0)) if row.get('min_C_prot_depth_right') else None,
-                    min_c_thread_depth_right=float(row.get('min_C_thread_depth_right', 0)) if row.get('min_C_thread_depth_right') else None,
-                    min_c_thread_slippage_right=float(row.get('min_C_thread_slippage_right', 0)) if row.get('min_C_thread_slippage_right') else None,
-                    prot_size=int(row.get('prot_size', 0)) if row.get('prot_size') else None,
-                    aco=float(row.get('ACO', 0)) if row.get('ACO') else None,
-                    rco=float(row.get('RCO', 0)) if row.get('RCO') else None,
-                    cc_bond=bool(row.get('CCBond', False)) if row.get('CCBond') else False
+                    gene=safe_str(row.get('gene', '')),
+                    PDB=safe_str(row.get('PDB', '')),
+                    chain=safe_str(row.get('chain', '')),
+                    ENT_ID=safe_int(row.get('ENT-ID', 0)),
+                    gn=safe_float(row.get('gn')),
+                    N_term_thread=safe_int(row.get('N_term_thread')),
+                    gc=safe_float(row.get('gc')),
+                    C_term_thread=safe_int(row.get('C_term_thread')),
+                    i=safe_int(row.get('i')),
+                    j=safe_int(row.get('j')),
+                    NC=safe_str(row.get('NC')),
+                    NC_wbuff=safe_str(row.get('NC_wbuff')),
+                    NC_region=safe_str(row.get('NC_region')),
+                    crossingsN=safe_str(row.get('crossingsN')),
+                    crossingsC=safe_str(row.get('crossingsC')),
+                    crossingsN_wbuff=safe_str(row.get('crossingsN_wbuff')),
+                    crossingsC_wbuff=safe_str(row.get('crossingsC_wbuff')),
+                    crossingsN_region=safe_str(row.get('crossingsN_region')),
+                    crossingsC_region=safe_str(row.get('crossingsC_region')),
+                    ent_region=safe_str(row.get('ent_region')),
+                    loopsize=safe_int(row.get('loopsize')),
+                    num_zipper_nc=safe_int(row.get('num_zipper_nc')),
+                    perc_bb_loop=safe_float(row.get('perc_bb_loop')),
+                    num_loop_contacting_res=safe_int(row.get('num_loop_contacting_res')),
+                    num_cross_nearest_neighbors=safe_int(row.get('num_cross_nearest_neighbors')),
+                    ent_coverage=safe_float(row.get('ent_coverage')),
+                    min_N_prot_depth_left=safe_float(row.get('min_N_prot_depth_left')),
+                    min_N_thread_depth_left=safe_float(row.get('min_N_thread_depth_left')),
+                    min_N_thread_slippage_left=safe_float(row.get('min_N_thread_slippage_left')),
+                    min_C_prot_depth_right=safe_float(row.get('min_C_prot_depth_right')),
+                    min_C_thread_depth_right=safe_float(row.get('min_C_thread_depth_right')),
+                    min_C_thread_slippage_right=safe_float(row.get('min_C_thread_slippage_right')),
+                    prot_size=safe_int(row.get('prot_size')),
+                    ACO=safe_float(row.get('ACO')),
+                    RCO=safe_float(row.get('RCO')),
+                    CCBond=safe_bool(row.get('CCBond'))
                 )
                 session.add(feature)
             

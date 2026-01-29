@@ -30,6 +30,16 @@ load_dotenv()
 # Add py directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
+# DEBUG: Log which EntDetect is being used
+import EntDetect
+with open('/tmp/backend_entdetect_debug.log', 'a') as f:
+    f.write(f"Backend started at {datetime.now()}\n")
+    f.write(f"Python: {sys.executable}\n")
+    f.write(f"Python version: {sys.version}\n")
+    f.write(f"EntDetect: {EntDetect.__file__}\n")
+    f.write(f"sys.path[0]: {sys.path[0]}\n")
+    f.write("---\n")
+
 from api_wrapper import calculate_native_ge
 from database import db, Job, Result, HQResult, ClusteredResult
 from email_notifier import email_notifier

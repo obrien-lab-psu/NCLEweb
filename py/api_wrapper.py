@@ -9,6 +9,16 @@ import sys
 import tempfile
 import shutil
 from pathlib import Path
+
+# DEBUG: Log which EntDetect is being used
+import EntDetect
+with open('/tmp/api_wrapper_entdetect_debug.log', 'a') as f:
+    import datetime
+    f.write(f"api_wrapper imported at {datetime.datetime.now()}\n")
+    f.write(f"EntDetect: {EntDetect.__file__}\n")
+    f.write(f"Python executable: {sys.executable}\n")
+    f.write("---\n")
+
 from EntDetect.gaussian_entanglement import GaussianEntanglement
 import pandas as pd
 import MDAnalysis as mda
@@ -25,10 +35,18 @@ except ImportError as e:
     CLUSTERING_AVAILABLE = False
 
 try:
+    # Try to use custom feature generator first (bypasses buggy EntDetect FeatureGen)
+    from custom_feature_gen import generate_features_from_clustered
+    CUSTOM_FEATURE_GEN_AVAILABLE = True
+except ImportError:
+    CUSTOM_FEATURE_GEN_AVAILABLE = False
+    print("Warning: Custom feature generator not available")
+
+try:
     from EntDetect.entanglement_features import FeatureGen
     FEATURE_GEN_AVAILABLE = True
 except ImportError as e:
-    print(f"Warning: Feature generation not available: {e}")
+    print(f"Warning: EntDetect feature generation not available: {e}")
     FEATURE_GEN_AVAILABLE = False
 
 
@@ -119,6 +137,24 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
     # Extract PDB ID from filename
     pdb_id = Path(pdb_path).stem
     result['pdb_id'] = pdb_id
+    
+    # DEBUG: Log parameters and EntDetect source
+    with open('/tmp/api_wrapper_entdetect_debug.log', 'a') as f:
+        import datetime
+        f.write(f"\ncalculate_native_ge called at {datetime.datetime.now()}\n")
+        f.write(f"  pdb_id: {pdb_id}\n")
+        f.write(f"  ent_detection_method: {ent_detection_method}\n")
+        f.write(f"  coarse_grained: {coarse_grained}\n")
+        f.write(f"  ca_contact: {ca_contact}\n")
+        f.write(f"  GaussianEntanglement module: {GaussianEntanglement.__module__}\n")
+        f.write(f"  GaussianEntanglement file: {GaussianEntanglement.__module__.split('.')[0]}\n")
+        # Try to get the actual file
+        try:
+            import inspect
+            f.write(f"  GaussianEntanglement source file: {inspect.getfile(GaussianEntanglement)}\n")
+        except:
+            f.write(f"  Could not get GaussianEntanglement source file\n")
+        f.write("---\n")
     
     # Verify input file exists
     if not os.path.exists(pdb_path):
@@ -326,16 +362,18 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         log_file.flush()
         print(log_msg, file=sys.stderr)
         
-        if generate_features and uniprot_id and result.get('clustered_data') is not None and FEATURE_GEN_AVAILABLE:
+        if generate_features and uniprot_id and result.get('clustered_data') is not None and (CUSTOM_FEATURE_GEN_AVAILABLE or FEATURE_GEN_AVAILABLE):
             try:
                 log_file.write(f"\n>>> STARTING FEATURE GENERATION for {uniprot_id}\n")
                 log_file.flush()
                 print(f"\n>>> STARTING FEATURE GENERATION <<<", file=sys.stderr)
                 print(f"Generating entanglement features for {uniprot_id}", file=sys.stderr)
                 
-                # DEBUG: Check EntDetect version
+                # DEBUG: Check which feature generator will be used
                 import EntDetect
                 log_file.write(f"EntDetect being used: {EntDetect.__file__}\n")
+                log_file.write(f"CUSTOM_FEATURE_GEN_AVAILABLE: {CUSTOM_FEATURE_GEN_AVAILABLE}\n")
+                log_file.write(f"Using custom feature generator: {CUSTOM_FEATURE_GEN_AVAILABLE}\n")
                 log_file.flush()
                 
                 clustered_file_path = os.path.join(temp_dir, f'combined_clustered_{pdb_id}.csv')
@@ -352,24 +390,45 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         chain_id = f"{pdb_id}_{chain}" if chain else pdb_id
                         log_file.write(f"  Processing chain: {chain if chain else 'empty'}\n")
                         
-                        # Create FeatureGen instance
-                        fgen = FeatureGen(
-                            PDBfile=analysis_pdb,  # Use filtered PDB
-                            outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
-                            cluster_file=clustered_file_path
-                        )
+                        # Use custom feature generator to avoid EntDetect bug
+                        if CUSTOM_FEATURE_GEN_AVAILABLE:
+                            features_result = generate_features_from_clustered(
+                                clustered_csv_path=clustered_file_path,
+                                uniprot_id=uniprot_id,
+                                pdb_id=pdb_id,
+                                pdb_file=analysis_pdb,
+                                outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
+                                chain=chain if chain else None
+                            )
+                            log_file.write(f"    Custom feature generator result: success={features_result.get('success')}\n")
+                        else:
+                            # Fallback to EntDetect FeatureGen
+                            log_file.write(f"    Using EntDetect FeatureGen (custom not available)\n")
+                            log_file.write(f"    FeatureGen class: {FeatureGen}\n")
+                            log_file.write(f"    FeatureGen module: {FeatureGen.__module__}\n")
+                            import inspect
+                            try:
+                                fgen_file = inspect.getfile(FeatureGen)
+                                log_file.write(f"    FeatureGen source file: {fgen_file}\n")
+                            except:
+                                log_file.write(f"    Could not determine FeatureGen source file\n")
+                            log_file.flush()
+                            # Use positional argument for PDBfile to match run_nativeNCLE.py exactly
+                            fgen = FeatureGen(
+                                analysis_pdb,
+                                outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
+                                cluster_file=clustered_file_path
+                            )
+                            features_result = fgen.get_uent_features(
+                                gene=uniprot_id,
+                                chain=chain if chain else None,
+                                pdbid=pdb_id
+                            )
                         
-                        # Get entanglement features
-                        features_result = fgen.get_uent_features(
-                            gene=uniprot_id,
-                            chain=chain if chain else None,
-                            pdbid=pdb_id
-                        )
-                        
-                        log_file.write(f"    features_result type: {type(features_result)}, value: {features_result}\n")
+                        log_file.write(f"    features_result type: {type(features_result)}, has outfile: {'outfile' in features_result if isinstance(features_result, dict) else False}\n")
                         log_file.flush()
                         
-                        if features_result and 'outfile' in features_result:
+                        if features_result and isinstance(features_result, dict) and 'outfile' in features_result:
                             features_file = features_result['outfile']
                             log_file.write(f"    Found outfile: {features_file}\n")
                             if os.path.exists(features_file):
@@ -404,6 +463,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         log_file.write(f"    ✗ Exception: {e}\n")
                         log_file.flush()
                         print(f"Warning: Could not generate features for chain {chain}: {e}")
+
                 
                 if all_features_dfs:
                     combined_features_df = pd.concat(all_features_dfs, ignore_index=True)

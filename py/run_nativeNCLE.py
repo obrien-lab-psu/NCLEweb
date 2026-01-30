@@ -102,6 +102,7 @@ if __name__ == "__main__":
         FGen = FeatureGen(struct, outdir=os.path.join(outdir, "Native_clustered_HQ_GE_features"), cluster_file=nativeClusteredEnt['outfile'])
         EntFeatures = FGen.get_uent_features(gene=args.Accession, chain=chain_id, pdbid=ID)
         print(f'Entanglement features saved to {EntFeatures["outfile"]}')
+        print(EntFeatures['results'], type(EntFeatures['results']), EntFeatures['results'].iloc[0])
 
 
     print(f'NORMAL TERMINATION - {time.time() - start_time} seconds')

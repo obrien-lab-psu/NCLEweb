@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/ianms/miniconda3/bin/ python3
 """
 API Wrapper for Gaussian Entanglement Analysis
 Simplified interface to accept PDB files and return raw Native GE results
@@ -10,14 +10,6 @@ import tempfile
 import shutil
 from pathlib import Path
 
-# DEBUG: Log which EntDetect is being used
-import EntDetect
-with open('/tmp/api_wrapper_entdetect_debug.log', 'a') as f:
-    import datetime
-    f.write(f"api_wrapper imported at {datetime.datetime.now()}\n")
-    f.write(f"EntDetect: {EntDetect.__file__}\n")
-    f.write(f"Python executable: {sys.executable}\n")
-    f.write("---\n")
 
 from EntDetect.gaussian_entanglement import GaussianEntanglement
 import pandas as pd
@@ -35,19 +27,12 @@ except ImportError as e:
     CLUSTERING_AVAILABLE = False
 
 try:
-    # Try to use custom feature generator first (bypasses buggy EntDetect FeatureGen)
-    from custom_feature_gen import generate_features_from_clustered
-    CUSTOM_FEATURE_GEN_AVAILABLE = True
-except ImportError:
-    CUSTOM_FEATURE_GEN_AVAILABLE = False
-    print("Warning: Custom feature generator not available")
-
-try:
     from EntDetect.entanglement_features import FeatureGen
     FEATURE_GEN_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: EntDetect feature generation not available: {e}")
     FEATURE_GEN_AVAILABLE = False
+
 
 
 def get_chains(pdb_path):
@@ -75,7 +60,7 @@ def get_chains(pdb_path):
         return ['']  # Return single empty chain on error
 
 
-def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None, ent_detection_method=3, uniprot_id=None, generate_features=False):
+def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="Ecoli", coarse_grained=False, ca_contact=False, cluster_cutoff=None, ent_detection_method=3, uniprot_id=None, generate_features=False, skip_preprocessing=False):
     """
     Calculate native Gaussian entanglement for a PDB file.
     Runs Native_GE, Native_HQ_GE, and Native_clustered_HQ_GE analyses.
@@ -103,6 +88,9 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         UniProt accession ID for feature generation, by default None
     generate_features : bool, optional
         Whether to generate entanglement features, by default False
+    skip_preprocessing : bool, optional
+        Whether to skip PDB preprocessing/filtering, by default False
+        Use True to match behavior of run_nativeNCLE.py exactly
         
     Returns
     -------
@@ -166,35 +154,43 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
     print(f"Preprocessing PDB file: {pdb_path}")
     print(f"{'='*60}")
     
-    # Create a filtered PDB for analysis (keeps original for visualization)
-    filtered_pdb_path = pdb_path.replace('.pdb', '_filtered.pdb')
-    
-    preprocess_result = preprocess_pdb(
-        pdb_path=pdb_path,
-        is_coarse_grained=coarse_grained,
-        output_path=filtered_pdb_path,  # Write to separate file
-        min_residues=10
-    )
-    
-    if not preprocess_result['success']:
-        result['error'] = preprocess_result['error']
+    if skip_preprocessing:
+        print("⚠ PDB preprocessing skipped - using original file directly")
+        analysis_pdb = pdb_path
+        filtered_pdb_path = None
+        result['skipped_chains'] = []
+        result['valid_chains'] = ['A']  # Assume chain A if not specified
+        result['warnings'] = []
+    else:
+        # Create a filtered PDB for analysis (keeps original for visualization)
+        filtered_pdb_path = pdb_path.replace('.pdb', '_filtered.pdb')
+        
+        preprocess_result = preprocess_pdb(
+            pdb_path=pdb_path,
+            is_coarse_grained=coarse_grained,
+            output_path=filtered_pdb_path,  # Write to separate file
+            min_residues=10
+        )
+        
+        if not preprocess_result['success']:
+            result['error'] = preprocess_result['error']
+            result['warnings'] = preprocess_result.get('warnings', [])
+            return result
+        
+        # Store preprocessing warnings and chain info
         result['warnings'] = preprocess_result.get('warnings', [])
-        return result
-    
-    # Store preprocessing warnings and chain info
-    result['warnings'] = preprocess_result.get('warnings', [])
-    result['skipped_chains'] = preprocess_result.get('skipped_chains', [])
-    result['valid_chains'] = preprocess_result.get('valid_chains', [])
-    
-    if preprocess_result.get('skipped_chains'):
-        print(f"\n⚠ Skipped chains with < 10 residues: {', '.join(preprocess_result['skipped_chains'])}")
-        print(f"   These chains will be visible in structure viewer but not analyzed.")
-    
-    print(f"✓ Valid chains for analysis: {', '.join(preprocess_result['valid_chains'])}")
-    print(f"✓ Total residues to analyze: {preprocess_result['total_residues_kept']}")
-    
-    # Use filtered PDB for analysis
-    analysis_pdb = filtered_pdb_path
+        result['skipped_chains'] = preprocess_result.get('skipped_chains', [])
+        result['valid_chains'] = preprocess_result.get('valid_chains', [])
+        
+        if preprocess_result.get('skipped_chains'):
+            print(f"\n⚠ Skipped chains with < 10 residues: {', '.join(preprocess_result['skipped_chains'])}")
+            print(f"   These chains will be visible in structure viewer but not analyzed.")
+        
+        print(f"✓ Valid chains for analysis: {', '.join(preprocess_result['valid_chains'])}")
+        print(f"✓ Total residues to analyze: {preprocess_result['total_residues_kept']}")
+        
+        # Use filtered PDB for analysis
+        analysis_pdb = filtered_pdb_path
     
     # Detect chains in the filtered structure
     chains = get_chains(analysis_pdb)
@@ -207,6 +203,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
     all_native_dfs = []
     all_hq_dfs = []
     all_clustered_dfs = []
+    chain_clustered_files = {}  # Store per-chain clustered files for feature generation
     
     try:
         # Process each chain
@@ -305,6 +302,8 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                             clustered_df['ENT'] = True
                             
                             all_clustered_dfs.append(clustered_df)
+                            # Save the per-chain clustered file path for later feature generation
+                            chain_clustered_files[chain if chain else 'default'] = clustered_ent['outfile']
                             print(f"Native_clustered_HQ_GE complete for chain {chain}. Found {len(clustered_df)} clustered results.")
                         else:
                             print(f"No clustered entanglements found for chain {chain}.")
@@ -356,81 +355,57 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         
         # Generate entanglement features if requested
         import sys
-        log_file = open('logs/feature_generation.log', 'a')
-        log_msg = f"\n>>> Feature generation check for {pdb_id}:\n    generate_features={generate_features}\n    uniprot_id={uniprot_id}\n    clustered_data present={result.get('clustered_data') is not None}\n    FEATURE_GEN_AVAILABLE={FEATURE_GEN_AVAILABLE}\n"
-        log_file.write(log_msg)
-        log_file.flush()
-        print(log_msg, file=sys.stderr)
-        
-        if generate_features and uniprot_id and result.get('clustered_data') is not None and (CUSTOM_FEATURE_GEN_AVAILABLE or FEATURE_GEN_AVAILABLE):
+
+        if generate_features and uniprot_id and result.get('clustered_data') is not None and FEATURE_GEN_AVAILABLE:
             try:
-                log_file.write(f"\n>>> STARTING FEATURE GENERATION for {uniprot_id}\n")
-                log_file.flush()
+
                 print(f"\n>>> STARTING FEATURE GENERATION <<<", file=sys.stderr)
                 print(f"Generating entanglement features for {uniprot_id}", file=sys.stderr)
                 
-                # DEBUG: Check which feature generator will be used
-                import EntDetect
-                log_file.write(f"EntDetect being used: {EntDetect.__file__}\n")
-                log_file.write(f"CUSTOM_FEATURE_GEN_AVAILABLE: {CUSTOM_FEATURE_GEN_AVAILABLE}\n")
-                log_file.write(f"Using custom feature generator: {CUSTOM_FEATURE_GEN_AVAILABLE}\n")
-                log_file.flush()
-                
-                clustered_file_path = os.path.join(temp_dir, f'combined_clustered_{pdb_id}.csv')
-                result['clustered_data'].to_csv(clustered_file_path, sep='|', index=False)
-                
                 # Generate features for each chain
                 all_features_dfs = []
-                log_file.write(f"  Chains detected: {chains}\n")
-                log_file.flush()
+                print(f"  Chains detected: {chains}\n")
+         
                 print(f"DEBUG: About to iterate over chains: {chains}", file=sys.stderr)
                 for chain in chains:
+                    # Use the per-chain clustered file that was created during clustering
+                    chain_key = chain if chain else 'default'
+                    if chain_key not in chain_clustered_files:
+                        print(f"DEBUG: Skipping chain {chain} - no clustered file found", file=sys.stderr)
+                        continue
+                    
+                    clustered_file_path = chain_clustered_files[chain_key]
                     print(f"DEBUG: Processing chain: {chain}", file=sys.stderr)
                     try:
                         chain_id = f"{pdb_id}_{chain}" if chain else pdb_id
-                        log_file.write(f"  Processing chain: {chain if chain else 'empty'}\n")
+                        print(f"  Processing chain: {chain if chain else 'empty'}\n")
                         
-                        # Use custom feature generator to avoid EntDetect bug
-                        if CUSTOM_FEATURE_GEN_AVAILABLE:
-                            features_result = generate_features_from_clustered(
-                                clustered_csv_path=clustered_file_path,
-                                uniprot_id=uniprot_id,
-                                pdb_id=pdb_id,
-                                pdb_file=analysis_pdb,
-                                outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
-                                chain=chain if chain else None
-                            )
-                            log_file.write(f"    Custom feature generator result: success={features_result.get('success')}\n")
-                        else:
-                            # Fallback to EntDetect FeatureGen
-                            log_file.write(f"    Using EntDetect FeatureGen (custom not available)\n")
-                            log_file.write(f"    FeatureGen class: {FeatureGen}\n")
-                            log_file.write(f"    FeatureGen module: {FeatureGen.__module__}\n")
-                            import inspect
-                            try:
-                                fgen_file = inspect.getfile(FeatureGen)
-                                log_file.write(f"    FeatureGen source file: {fgen_file}\n")
-                            except:
-                                log_file.write(f"    Could not determine FeatureGen source file\n")
-                            log_file.flush()
-                            # Use positional argument for PDBfile to match run_nativeNCLE.py exactly
-                            fgen = FeatureGen(
-                                analysis_pdb,
-                                outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
-                                cluster_file=clustered_file_path
-                            )
-                            features_result = fgen.get_uent_features(
-                                gene=uniprot_id,
-                                chain=chain if chain else None,
-                                pdbid=pdb_id
-                            )
+
+  
+                        # Use positional argument for PDBfile to match run_nativeNCLE.py exactly
+                        print(f'analysis_pdb: {analysis_pdb}', file=sys.stderr)
+                        print(f'clustered_file_path: {clustered_file_path}', file=sys.stderr)
+                        print(f'outdir: {os.path.join(temp_dir, f"features_chain_{chain}")}', file=sys.stderr)
+                        fgen = FeatureGen(
+                            analysis_pdb,
+                            outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
+                            cluster_file=clustered_file_path
+                        )
+            
+                        features_result = fgen.get_uent_features(
+                            gene=uniprot_id,
+                            chain=chain if chain else None,
+                            pdbid=pdb_id
+                        )
+                        # print(f'features_result: {features_result}', file=sys.stderr)
+                        print(features_result['results'], type(features_result['results']), features_result['results'].iloc[0])
+        
                         
-                        log_file.write(f"    features_result type: {type(features_result)}, has outfile: {'outfile' in features_result if isinstance(features_result, dict) else False}\n")
-                        log_file.flush()
+                        print(f"    features_result type: {type(features_result)}, has outfile: {'outfile' in features_result if isinstance(features_result, dict) else False}\n")
                         
                         if features_result and isinstance(features_result, dict) and 'outfile' in features_result:
                             features_file = features_result['outfile']
-                            log_file.write(f"    Found outfile: {features_file}\n")
+                            print(f"    Found outfile: {features_file}\n")
                             if os.path.exists(features_file):
                                 # Read features CSV
                                 features_df = pd.read_csv(features_file, sep='|')
@@ -439,60 +414,59 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                                 import shutil
                                 debug_csv_path = f"/tmp/debug_features_{chain if chain else 'default'}.csv"
                                 shutil.copy(features_file, debug_csv_path)
-                                log_file.write(f"    ✓ Loaded {len(features_df)} features from CSV (copied to {debug_csv_path})\n")
-                                log_file.write(f"    CSV separator appears to be: pipe (|)\n")
-                                log_file.write(f"    Columns in CSV: {list(features_df.columns)}\n")
-                                log_file.write(f"    DataFrame dtypes:\n")
+                                print(f"    ✓ Loaded {len(features_df)} features from CSV (copied to {debug_csv_path})\n")
+                                print(f"    CSV separator appears to be: pipe (|)\n")
+                                print(f"    Columns in CSV: {list(features_df.columns)}\n")
+                                print(f"    DataFrame dtypes:\n")
                                 for col in ['crossingsN', 'crossingsC', 'N_term_thread', 'C_term_thread']:
                                     if col in features_df.columns:
-                                        log_file.write(f"      {col}: {features_df[col].dtype}\n")
+                                        print(f"      {col}: {features_df[col].dtype}\n")
                                 if len(features_df) > 0:
-                                    log_file.write(f"    First row values:\n")
+                                    print(f"    First row values:\n")
                                     for col in ['ENT-ID', 'N_term_thread', 'C_term_thread', 'crossingsN', 'crossingsC']:
                                         val = features_df.iloc[0].get(col, 'MISSING')
-                                        log_file.write(f"      {col}: {val} (type: {type(val).__name__})\n")
-                                log_file.flush()
+                                        print(f"      {col}: {val} (type: {type(val).__name__})\n")
+                       
                                 print(f"Generated features for chain {chain if chain else 'default'}: {len(features_df)} features")
                             else:
-                                log_file.write(f"    ✗ Outfile does not exist: {features_file}\n")
-                                log_file.flush()
+                                print(f"    ✗ Outfile does not exist: {features_file}\n")
+                       
                         else:
-                            log_file.write(f"    ✗ No outfile in result or result is empty\n")
-                            log_file.flush()
+                            print(f"    ✗ No outfile in result or result is empty\n")
+                   
                     except Exception as e:
-                        log_file.write(f"    ✗ Exception: {e}\n")
-                        log_file.flush()
+                        print(f"    ✗ Exception: {e}\n")
+            
                         print(f"Warning: Could not generate features for chain {chain}: {e}")
 
                 
                 if all_features_dfs:
                     combined_features_df = pd.concat(all_features_dfs, ignore_index=True)
                     result['features_data'] = combined_features_df
-                    log_file.write(f"SUCCESS: Combined {len(combined_features_df)} features from {len(all_features_dfs)} chain(s)\n")
-                    log_file.write(f"  Combined DF shape: {combined_features_df.shape}\n")
-                    log_file.write(f"  Combined DF columns: {list(combined_features_df.columns)}\n")
-                    log_file.write(f"  First row of combined DF:\n")
+                    print(f"SUCCESS: Combined {len(combined_features_df)} features from {len(all_features_dfs)} chain(s)\n")
+                    print(f"  Combined DF shape: {combined_features_df.shape}\n")
+                    print(f"  Combined DF columns: {list(combined_features_df.columns)}\n")
+                    print(f"  First row of combined DF:\n")
                     if len(combined_features_df) > 0:
                         for col in ['ENT-ID', 'N_term_thread', 'C_term_thread', 'crossingsN', 'crossingsC']:
                             val = combined_features_df.iloc[0].get(col, 'MISSING')
-                            log_file.write(f"    {col}: {val} (type: {type(val).__name__})\n")
-                    log_file.flush()
+                            print(f"    {col}: {val} (type: {type(val).__name__})\n")
+                 
                     print(f"Combined features: {len(combined_features_df)} total features from {len(all_features_dfs)} chain(s)")
                 else:
-                    log_file.write("FAILED: No features generated for any chain\n")
-                    log_file.flush()
+                    print("FAILED: No features generated for any chain\n")
+              
                     print("No features generated for any chain")
             except Exception as e:
-                log_file.write(f"EXCEPTION during feature generation: {e}\n")
-                log_file.flush()
+                print(f"EXCEPTION during feature generation: {e}\n")
+            
                 print(f"Warning: Feature generation failed: {e}")
                 result['features_data'] = None
         elif generate_features and not FEATURE_GEN_AVAILABLE:
-            log_file.write("WARNING: Feature generation requested but FeatureGen module not available\n")
-            log_file.flush()
+            print("WARNING: Feature generation requested but FeatureGen module not available\n")
+      
             print("Warning: Feature generation requested but FeatureGen module not available")
-        
-        log_file.close()
+   
         
     except Exception as e:
         # Log to file as well
@@ -511,8 +485,8 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
             shutil.rmtree(temp_dir)
             print(f"Cleaned up temporary directory: {temp_dir}")
         
-        # Clean up filtered PDB file
-        if cleanup and 'filtered_pdb_path' in locals() and os.path.exists(filtered_pdb_path):
+        # Clean up filtered PDB file if it was created
+        if cleanup and filtered_pdb_path and os.path.exists(filtered_pdb_path):
             os.remove(filtered_pdb_path)
             print(f"Cleaned up filtered PDB: {filtered_pdb_path}")
     

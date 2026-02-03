@@ -611,14 +611,6 @@
                 <small>Select multiple .pdb files at once. You can select up to 100 files per batch.</small>
             </div>
             
-            <div class="form-group" id="multiUniprotListContainer" style="display: none;">
-                <label>
-                    UniProt Accession IDs <span id="multiUniprotListRequired" class="required" style="display: none;">*</span>
-                </label>
-                <div id="multiUniprotList" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; max-height: 250px; overflow-y: auto;"></div>
-                <small id="multiUniprotListHelp">Optional: Enter a UniProt Accession ID for each file. Leave blank if not needed. <strong id="multiUniprotListRequiredText" style="display: none;">Required if generating features.</strong></small>
-            </div>
-            
             <!-- Per-File Options Section -->
             <div class="form-group" id="multiPerFileOptionsContainer" style="display: none;">
                 <label><strong>Per-File Analysis Options</strong></label>
@@ -689,15 +681,12 @@
         function updateMultiFileList() {
             const fileInput = document.getElementById('multiPdbFiles');
             const fileList = document.getElementById('multiFileList');
-            const multiUniprotListContainer = document.getElementById('multiUniprotListContainer');
-            const multiUniprotList = document.getElementById('multiUniprotList');
             const multiPerFileOptionsContainer = document.getElementById('multiPerFileOptionsContainer');
             const multiPerFileOptions = document.getElementById('multiPerFileOptions');
             const files = fileInput.files;
             
             if (files.length === 0) {
                 fileList.innerHTML = '<p style="color: #999; margin: 0;">No files selected</p>';
-                multiUniprotListContainer.style.display = 'none';
                 multiPerFileOptionsContainer.style.display = 'none';
                 return;
             }
@@ -713,22 +702,6 @@
             
             html += '</ul>';
             fileList.innerHTML = html;
-            
-            // Show UniProt ID inputs for each file
-            multiUniprotListContainer.style.display = 'block';
-            let uniprotHtml = '';
-            for (let i = 0; i < files.length; i++) {
-                const inputId = 'multiUniprot_' + i;
-                uniprotHtml += '<div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #ddd;">';
-                uniprotHtml += '<label style="display: block; margin-bottom: 4px; font-weight: 500; color: #333;">';
-                uniprotHtml += files[i].name;
-                uniprotHtml += '</label>';
-                uniprotHtml += '<input type="text" id="' + inputId + '" class="multiUniprotInput" ';
-                uniprotHtml += 'placeholder="Optional UniProt ID (e.g., P12345)" maxlength="50" ';
-                uniprotHtml += 'style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">';
-                uniprotHtml += '</div>';
-            }
-            multiUniprotList.innerHTML = uniprotHtml;
             
             // Show per-file options
             multiPerFileOptionsContainer.style.display = 'block';
@@ -787,6 +760,14 @@
                 optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="detectionMethod_' + fileIdx + '" value="2"> Method 2 (TLN)</label>';
                 optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="detectionMethod_' + fileIdx + '" value="3" checked> Method 3 (Consensus)</label>';
                 optionsHtml += '</div>';
+                optionsHtml += '</div>';
+                
+                // UniProt Accession ID
+                optionsHtml += '<div style="margin-bottom: 8px;">';
+                optionsHtml += '<label style="font-size: 0.9em; color: #666;">UniProt Accession ID (Optional)</label>';
+                optionsHtml += '<input type="text" class="multiUniprotInput" id="multiUniprot_' + fileIdx + '" ';
+                optionsHtml += 'placeholder="Optional UniProt ID (e.g., P12345)" maxlength="50" ';
+                optionsHtml += 'style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 3px; font-family: monospace; font-size: 0.85em;">';
                 optionsHtml += '</div>';
                 
                 // Generate Features

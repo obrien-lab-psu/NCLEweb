@@ -11,8 +11,32 @@ Web application for calculating Non-covalent Lasso Entanglement from PDB structu
 - ✅ Protected by Cloudflare (DDoS protection, SSL, rate limiting)
 - ✅ Email notifications enabled
 - ✅ Custom organism support with clustering cutoffs
+- ✅ **NEW: Batch submission with priority queuing** - Submit multiple files efficiently!
 - 📅 Demo period: 1 week
 - 🔄 Migration to production server planned after approval
+
+## What's New: Batch Submission 🆕
+
+The application now supports batch submissions with an intelligent priority queue system:
+
+**Features:**
+- Submit multiple PDB files at once (up to 100 per batch)
+- ZIP file submission with per-file parameters
+- No artificial limits on total submissions
+- Priority-based queue ensures small jobs don't starve
+- Aggregate results download
+- Real-time batch status tracking
+
+**How it works:**
+- Small jobs (< 100 KB) get high priority and run first
+- Large jobs (≥ 100 KB) run in isolation to avoid blocking
+- Up to 4 small jobs can run simultaneously
+- Only 1 large job runs at a time (ensures clean resource allocation)
+
+**Documentation:**
+- [Batch Submission Guide](BATCH_SUBMISSION_GUIDE.md) - Complete API reference
+- [Frontend Integration Guide](FRONTEND_BATCH_INTEGRATION.md) - HTML/JS implementation
+- [Implementation Summary](BATCH_IMPLEMENTATION_SUMMARY.md) - Architecture overview
 
 ## Architecture
 
@@ -21,10 +45,13 @@ Web application for calculating Non-covalent Lasso Entanglement from PDB structu
 * Job submission form with organism selection (E. coli, Human, Yeast, Custom)
 * Interactive NGL viewer for structure visualization
 * Results browser with filtering and sorting
+* **NEW: Batch submission interface with multiple file support**
 * Served as static files by Nginx
 
 **Backend (Python FastAPI):**
 * RESTful API for job submission and management
+* **NEW: Batch submission endpoints (multiple files and ZIP)**
+* **NEW: Priority-based job queuing system**
 * Background job processing with status tracking
 * Email notifications on job completion
 * SQLite database for job persistence
@@ -42,8 +69,10 @@ Web application for calculating Non-covalent Lasso Entanglement from PDB structu
 * `py/api_wrapper.py` - Interface to EntDetect gaussian_entanglement
 * `py/database.py` - SQLite database models and operations
 * `py/email_notifier.py` - SMTP email notification system
+* **`py/job_queue.py`** - **NEW: Priority queue manager**
+* **`py/batch_submission.py`** - **NEW: Batch processing handler**
 * `index.html` - Landing page
-* `submit.html` - Job submission form
+* `submit.html` - Job submission form (will be updated with batch UI)
 * `browse.html` - Job browser
 * `results.html` - Results viewer with NGL integration
 

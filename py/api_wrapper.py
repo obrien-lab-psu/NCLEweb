@@ -26,12 +26,8 @@ except ImportError as e:
     print(f"Warning: Clustering not available: {e}")
     CLUSTERING_AVAILABLE = False
 
-try:
-    from EntDetect.entanglement_features import FeatureGen
-    FEATURE_GEN_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: EntDetect feature generation not available: {e}")
-    FEATURE_GEN_AVAILABLE = False
+# Don't import FeatureGen at module level - import it where needed inside functions
+FEATURE_GEN_AVAILABLE = True  # Assume it's available, check at runtime if needed
 
 
 
@@ -358,6 +354,8 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
 
         if generate_features and uniprot_id and result.get('clustered_data') is not None and FEATURE_GEN_AVAILABLE:
             try:
+                # Import FeatureGen locally to avoid module context issues
+                from EntDetect.entanglement_features import FeatureGen
 
                 print(f"\n>>> STARTING FEATURE GENERATION <<<", file=sys.stderr)
                 print(f"Generating entanglement features for {uniprot_id}", file=sys.stderr)
@@ -386,6 +384,15 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         print(f'analysis_pdb: {analysis_pdb}', file=sys.stderr)
                         print(f'clustered_file_path: {clustered_file_path}', file=sys.stderr)
                         print(f'outdir: {os.path.join(temp_dir, f"features_chain_{chain}")}', file=sys.stderr)
+                        
+                        # DEBUG: Check if FeatureGen is available before calling
+                        print(f'DEBUG: FeatureGen available: {FEATURE_GEN_AVAILABLE}', file=sys.stderr)
+                        print(f'DEBUG: FeatureGen class: {FeatureGen}', file=sys.stderr)
+                        try:
+                            print(f'DEBUG: FeatureGen module: {FeatureGen.__module__}', file=sys.stderr)
+                        except Exception as debug_e:
+                            print(f'DEBUG: Could not get FeatureGen module: {debug_e}', file=sys.stderr)
+                        
                         fgen = FeatureGen(
                             analysis_pdb,
                             outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
@@ -434,6 +441,11 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         else:
                             print(f"    ✗ No outfile in result or result is empty\n")
                    
+                    except AttributeError as ae:
+                        print(f"    ✗ AttributeError: {ae}\n", file=sys.stderr)
+                        print(f"    This usually means FeatureGen import failed silently.")
+                        print(f"    FeatureGen class should be: {FeatureGen}", file=sys.stderr)
+                        print(f"Warning: Could not generate features for chain {chain}: {ae}")
                     except Exception as e:
                         print(f"    ✗ Exception: {e}\n")
             
@@ -458,7 +470,9 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
               
                     print("No features generated for any chain")
             except Exception as e:
-                print(f"EXCEPTION during feature generation: {e}\n")
+                import traceback
+                print(f"EXCEPTION during feature generation: {e}\n", file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
             
                 print(f"Warning: Feature generation failed: {e}")
                 result['features_data'] = None

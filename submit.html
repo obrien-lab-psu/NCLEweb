@@ -153,7 +153,18 @@
             <p>Fill out the form below to analyze your PDB structure</p>
         </div>
         
-        <form id="submitForm" class="submit-form">
+        <!-- Submission Type Tabs -->
+        <div style="display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid #ddd;">
+            <button type="button" class="tab-button" onclick="switchSubmissionType(event, 'single')" style="padding: 12px 20px; background: none; border: none; cursor: pointer; font-size: 1em; border-bottom: 3px solid #667eea; color: #667eea;">
+                Single File
+            </button>
+            <button type="button" class="tab-button" onclick="switchSubmissionType(event, 'multiple')" style="padding: 12px 20px; background: none; border: none; cursor: pointer; font-size: 1em; border-bottom: 3px solid transparent; color: #666;">
+                Multiple Files
+            </button>
+        </div>
+        
+        <!-- Single File Form -->
+        <form id="submitForm" class="submit-form" style="display: block;" data-submission-type="single">
             <!-- Required Fields -->
             <div class="form-group">
                 <label>
@@ -509,6 +520,313 @@
             
             <div id="statusMessage" class="status-message"></div>
         </form>
+        
+        <!-- Multiple Files Form -->
+        <form id="multipleFilesForm" class="submit-form" style="display: none;" data-submission-type="multiple">
+            <div class="form-group">
+                <label for="multiEmail">
+                    Email Address <span class="required">*</span>
+                </label>
+                <input 
+                    type="email" 
+                    id="multiEmail" 
+                    name="email"
+                    required 
+                    placeholder="your.email@example.com"
+                >
+                <small>You'll receive a notification when all jobs are complete</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="multiBatchName">
+                    Batch Name <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="multiBatchName" 
+                    name="batchName"
+                    required 
+                    placeholder="My Multiple Structures Analysis"
+                    maxlength="200"
+                >
+                <small>A descriptive name for this batch submission</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="multiPdbFiles">
+                    PDB Files <span class="required">*</span>
+                </label>
+                <input 
+                    type="file" 
+                    id="multiPdbFiles" 
+                    name="files"
+                    accept=".pdb"
+                    multiple
+                    required
+                    onchange="updateMultiFileList()"
+                >
+                <div id="multiFileList" style="margin-top: 10px; padding: 10px; background: #f5f5f5; border-radius: 5px; max-height: 300px; overflow-y: auto;"></div>
+                <small>Select multiple .pdb files at once. You can select up to 100 files per batch.</small>
+            </div>
+            
+            <div class="form-group" id="multiUniprotListContainer" style="display: none;">
+                <label>
+                    UniProt Accession IDs <span id="multiUniprotListRequired" class="required" style="display: none;">*</span>
+                </label>
+                <div id="multiUniprotList" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; max-height: 250px; overflow-y: auto;"></div>
+                <small id="multiUniprotListHelp">Optional: Enter a UniProt Accession ID for each file. Leave blank if not needed. <strong id="multiUniprotListRequiredText" style="display: none;">Required if generating features.</strong></small>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    Structure Type <span class="required">*</span>
+                </label>
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiStructureTypeExp" 
+                            name="multiStructureType" 
+                            value="EXP" 
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span>Experimental (PDB)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiStructureTypeAF" 
+                            name="multiStructureType" 
+                            value="AF"
+                            style="margin-right: 8px;"
+                        >
+                        <span>AlphaFold (AF)</span>
+                    </label>
+                </div>
+                <small>Select whether all structures are experimental or AlphaFold predicted</small>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    Organism <span class="required">*</span>
+                </label>
+                <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiOrganismEcoli" 
+                            name="multiOrganism" 
+                            value="Ecoli" 
+                            checked
+                            style="margin-right: 8px;"
+                            onchange="toggleMultiCustomOrganism()"
+                        >
+                        <span>E. coli (cutoff: 57)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiOrganismHuman" 
+                            name="multiOrganism" 
+                            value="Human"
+                            style="margin-right: 8px;"
+                            onchange="toggleMultiCustomOrganism()"
+                        >
+                        <span>Human (cutoff: 52)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiOrganismYeast" 
+                            name="multiOrganism" 
+                            value="Yeast"
+                            style="margin-right: 8px;"
+                            onchange="toggleMultiCustomOrganism()"
+                        >
+                        <span>Yeast (cutoff: 49)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiOrganismCustom" 
+                            name="multiOrganism" 
+                            value="Custom"
+                            style="margin-right: 8px;"
+                            onchange="toggleMultiCustomOrganism()"
+                        >
+                        <span>Custom</span>
+                    </label>
+                </div>
+                <small>Select the organism for clustering analysis</small>
+            </div>
+            
+            <div class="form-group" id="multiCustomOrganismFields" style="display: none;">
+                <label>
+                    Custom Organism Name <span class="required">*</span>
+                </label>
+                <input 
+                    type="text" 
+                    id="multiCustomOrganismName" 
+                    placeholder="e.g., Mouse, Zebrafish, etc."
+                >
+                <small>Enter the organism name for your structures</small>
+            </div>
+            
+            <div class="form-group" id="multiCustomCutoffField" style="display: none;">
+                <label>
+                    Custom Clustering Cutoff <span class="required">*</span>
+                </label>
+                <input 
+                    type="number" 
+                    id="multiCustomCutoff" 
+                    placeholder="e.g., 50"
+                    min="1"
+                    step="1"
+                >
+                <small>Enter the distance cutoff for clustering (typical range: 45-60)</small>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    Model Resolution <span class="required">*</span>
+                </label>
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiModelResolutionAA" 
+                            name="multiModelResolution" 
+                            value="all-atom" 
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span>All-Atom</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiModelResolutionCG" 
+                            name="multiModelResolution" 
+                            value="ca-cg"
+                            style="margin-right: 8px;"
+                        >
+                        <span>C-alpha Coarse-Grained</span>
+                    </label>
+                </div>
+                <small>For C-alpha CG models, all PDB files must have atom names "A" and residue names "G1", "G2", etc.</small>
+            </div>
+            
+            <div class="form-group">
+                <label>
+                    Contact Type <span class="required">*</span>
+                </label>
+                <div style="display: flex; gap: 20px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiContactTypeHeavy" 
+                            name="multiContactType" 
+                            value="heavy-atom" 
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span>Heavy Atom Contacts</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiContactTypeCa" 
+                            name="multiContactType" 
+                            value="ca-contact"
+                            style="margin-right: 8px;"
+                        >
+                        <span>C-alpha Contacts</span>
+                    </label>
+                </div>
+                <small>Select the type of contacts to use for analysis</small>
+            </div>
+
+            <!-- Detection Method Selection -->
+            <div class="form-group">
+                <label>
+                    Entanglement Detection Method
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiDetectionMethod1" 
+                            name="multiDetectionMethod" 
+                            value="1"
+                            style="margin-right: 8px;"
+                        >
+                        <span><strong>Method 1:</strong> GLN-based (any nonzero Gaussian linking)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiDetectionMethod2" 
+                            name="multiDetectionMethod" 
+                            value="2"
+                            style="margin-right: 8px;"
+                        >
+                        <span><strong>Method 2:</strong> TLN-based (any nonzero topological linking)</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input 
+                            type="radio" 
+                            id="multiDetectionMethod3" 
+                            name="multiDetectionMethod" 
+                            value="3"
+                            checked
+                            style="margin-right: 8px;"
+                        >
+                        <span><strong>Method 3:</strong> Consensus (both GLN and TLN must agree) - Recommended</span>
+                    </label>
+                </div>
+                <small>Method used to determine if a non-covalent lasso entanglement is present</small>
+            </div>
+            
+            <!-- Generate NCLE Features Option -->
+            <div class="form-group">
+                <label style="display: flex; align-items: center; cursor: pointer;">
+                    <input 
+                        type="checkbox" 
+                        id="multiGenerateFeatures" 
+                        name="multiGenerateFeatures"
+                        style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;"
+                        onchange="toggleMultiFeaturesRequirement()"
+                    >
+                    <span><strong>Generate Entanglement Features</strong></span>
+                </label>
+                <small>If enabled, additional entanglement features will be calculated for structures that have UniProt IDs. Specify per-file above.</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="multiDescription">
+                    Batch Description (optional)
+                </label>
+                <textarea 
+                    id="multiDescription" 
+                    name="multiDescription" 
+                    placeholder="Additional notes about this batch submission..."
+                    maxlength="1000"
+                ></textarea>
+                <small>Any additional information about this batch</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='index.html'">
+                    Cancel
+                </button>
+                <button type="submit" class="btn btn-primary" id="multiSubmitBtn">
+                    Submit Multiple Files
+                </button>
+            </div>
+            
+            <div id="multiStatusMessage" class="status-message"></div>
+        </form>
     </div>
     
     <script>
@@ -519,6 +837,90 @@
         const form = document.getElementById('submitForm');
         const submitBtn = document.getElementById('submitBtn');
         const statusMessage = document.getElementById('statusMessage');
+        const multipleFilesForm = document.getElementById('multipleFilesForm');
+        const multiSubmitBtn = document.getElementById('multiSubmitBtn');
+        const multiStatusMessage = document.getElementById('multiStatusMessage');
+        
+        function switchSubmissionType(evt, type) {
+            evt.preventDefault();
+            
+            // Update tabs
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(btn => {
+                btn.style.borderBottom = '3px solid transparent';
+                btn.style.color = '#666';
+            });
+            evt.currentTarget.style.borderBottom = '3px solid #667eea';
+            evt.currentTarget.style.color = '#667eea';
+            
+            // Update forms
+            if (type === 'single') {
+                form.style.display = 'block';
+                multipleFilesForm.style.display = 'none';
+            } else if (type === 'multiple') {
+                form.style.display = 'none';
+                multipleFilesForm.style.display = 'block';
+            }
+        }
+        
+        function updateMultiFileList() {
+            const fileInput = document.getElementById('multiPdbFiles');
+            const fileList = document.getElementById('multiFileList');
+            const multiUniprotListContainer = document.getElementById('multiUniprotListContainer');
+            const multiUniprotList = document.getElementById('multiUniprotList');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                fileList.innerHTML = '<p style="color: #999; margin: 0;">No files selected</p>';
+                multiUniprotListContainer.style.display = 'none';
+                return;
+            }
+            
+            // Show file list
+            let html = '<p style="margin: 0 0 8px 0; font-weight: bold; color: #333;">' + files.length + ' file(s) selected:</p>';
+            html += '<ul style="margin: 0; padding-left: 20px;">';
+            
+            for (let i = 0; i < files.length; i++) {
+                const size = (files[i].size / 1024).toFixed(1);
+                html += '<li style="color: #555; margin: 4px 0;">' + files[i].name + ' (' + size + ' KB)</li>';
+            }
+            
+            html += '</ul>';
+            fileList.innerHTML = html;
+            
+            // Show UniProt ID inputs for each file
+            multiUniprotListContainer.style.display = 'block';
+            let uniprotHtml = '';
+            for (let i = 0; i < files.length; i++) {
+                const inputId = 'multiUniprot_' + i;
+                uniprotHtml += '<div style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #ddd;">';
+                uniprotHtml += '<label style="display: block; margin-bottom: 4px; font-weight: 500; color: #333;">';
+                uniprotHtml += files[i].name;
+                uniprotHtml += '</label>';
+                uniprotHtml += '<input type="text" id="' + inputId + '" class="multiUniprotInput" ';
+                uniprotHtml += 'placeholder="Optional UniProt ID (e.g., P12345)" maxlength="50" ';
+                uniprotHtml += 'style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-family: monospace;">';
+                uniprotHtml += '</div>';
+            }
+            multiUniprotList.innerHTML = uniprotHtml;
+        }
+        
+        function toggleMultiFeaturesRequirement() {
+            const generateFeatures = document.getElementById('multiGenerateFeatures').checked;
+            const multiUniprotListRequired = document.getElementById('multiUniprotListRequired');
+            const multiUniprotListRequiredText = document.getElementById('multiUniprotListRequiredText');
+            const multiUniprotListHelp = document.getElementById('multiUniprotListHelp');
+            
+            if (generateFeatures) {
+                multiUniprotListRequired.style.display = 'inline';
+                multiUniprotListRequiredText.style.display = 'inline';
+                multiUniprotListHelp.innerHTML = '<strong>Required:</strong> At least one UniProt Accession ID must be provided to generate entanglement features.';
+            } else {
+                multiUniprotListRequired.style.display = 'none';
+                multiUniprotListRequiredText.style.display = 'none';
+                multiUniprotListHelp.innerHTML = 'Optional: Enter a UniProt Accession ID for each file. Leave blank if not needed. <strong id="multiUniprotListRequiredText" style="display: none;">Required if generating features.</strong>';
+            }
+        }
         
         function toggleInputType() {
             const isFile = document.getElementById('inputTypeFile').checked;
@@ -786,6 +1188,187 @@
                 submitBtn.textContent = 'Submit Analysis';
             }
         });
+        
+        // Multiple Files Form Submission
+        multipleFilesForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Disable submit button
+            multiSubmitBtn.disabled = true;
+            multiSubmitBtn.textContent = 'Submitting...';
+            
+            // Get form data
+            const formData = new FormData();
+            formData.append('email', document.getElementById('multiEmail').value);
+            formData.append('batch_name', document.getElementById('multiBatchName').value);
+            
+            // Get files
+            const fileInput = document.getElementById('multiPdbFiles');
+            const files = fileInput.files;
+            
+            if (files.length === 0) {
+                showStatusMulti('Please select at least one PDB file', 'error');
+                multiSubmitBtn.disabled = false;
+                multiSubmitBtn.textContent = 'Submit Multiple Files';
+                return;
+            }
+            
+            if (files.length > 100) {
+                showStatusMulti('Maximum 100 files per batch', 'error');
+                multiSubmitBtn.disabled = false;
+                multiSubmitBtn.textContent = 'Submit Multiple Files';
+                return;
+            }
+            
+            // Append files to form data
+            for (let i = 0; i < files.length; i++) {
+                if (!files[i].name.endsWith('.pdb')) {
+                    showStatusMulti(`File "${files[i].name}" is not a PDB file. Only .pdb files are accepted.`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                formData.append('files', files[i]);
+            }
+            
+            // Get model resolution and contact type
+            const modelResolution = document.querySelector('input[name="multiModelResolution"]:checked').value;
+            const contactType = document.querySelector('input[name="multiContactType"]:checked').value;
+            const detectionMethod = document.querySelector('input[name="multiDetectionMethod"]:checked').value;
+            const isCaCG = (modelResolution === 'ca-cg');
+            const useCaContact = (contactType === 'ca-contact');
+            
+            // Validate combination: CG model cannot use heavy atom contacts
+            if (isCaCG && !useCaContact) {
+                showStatusMulti('Invalid combination: C-alpha Coarse-Grained models must use C-alpha Contacts (not Heavy Atom Contacts)', 'error');
+                multiSubmitBtn.disabled = false;
+                multiSubmitBtn.textContent = 'Submit Multiple Files';
+                return;
+            }
+            
+            // Check if generating features requires UniProt ID
+            const generateFeatures = document.getElementById('multiGenerateFeatures').checked;
+            
+            // Collect per-file UniProt IDs
+            const uniprotIds = {};
+            const uniprotInputs = document.querySelectorAll('.multiUniprotInput');
+            let hasAnyUniprot = false;
+            
+            for (let i = 0; i < files.length; i++) {
+                const inputId = 'multiUniprot_' + i;
+                const input = document.getElementById(inputId);
+                if (input) {
+                    const uniprotId = input.value.trim();
+                    if (uniprotId) {
+                        uniprotIds[files[i].name] = uniprotId;
+                        hasAnyUniprot = true;
+                    }
+                }
+            }
+            
+            // Validate: if generating features, at least one UniProt ID must be provided
+            if (generateFeatures && !hasAnyUniprot) {
+                showStatusMulti('At least one UniProt Accession ID is required when generating entanglement features', 'error');
+                multiSubmitBtn.disabled = false;
+                multiSubmitBtn.textContent = 'Submit Multiple Files';
+                return;
+            }
+            
+            // Append per-file UniProt IDs to form data
+            formData.append('uniprot_ids', JSON.stringify(uniprotIds));
+            
+            const structureType = document.querySelector('input[name="multiStructureType"]:checked').value;
+            formData.append('structure_type', structureType);
+            
+            // Handle organism and cutoff
+            const organismRadio = document.querySelector('input[name="multiOrganism"]:checked').value;
+            if (organismRadio === 'Custom') {
+                const customOrganism = document.getElementById('multiCustomOrganismName').value.trim();
+                const customCutoff = document.getElementById('multiCustomCutoff').value;
+                
+                if (!customOrganism) {
+                    showStatusMulti('Please enter a custom organism name', 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                
+                if (!customCutoff || customCutoff < 1) {
+                    showStatusMulti('Please enter a valid clustering cutoff (minimum 1)', 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                
+                formData.append('organism', customOrganism);
+                formData.append('cluster_cutoff', customCutoff);
+            } else {
+                formData.append('organism', organismRadio);
+            }
+            
+            // Only append boolean flags if true to avoid form parsing issues
+            if (isCaCG) {
+                formData.append('coarse_grained', 'on');
+            }
+            if (useCaContact) {
+                formData.append('ca_contact', 'on');
+            }
+            if (generateFeatures) {
+                formData.append('generate_features', 'on');
+            }
+            formData.append('ent_detection_method', detectionMethod);
+            
+            try {
+                showStatusMulti('Uploading and submitting batch...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/api/submit-batch-multiple`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                // Try to parse response as JSON, with fallback to text
+                let data;
+                let responseText;
+                try {
+                    responseText = await response.text();
+                    data = responseText ? JSON.parse(responseText) : {};
+                } catch (e) {
+                    // If JSON parsing fails, show the raw response
+                    console.error('Response was not JSON. Status:', response.status, 'Content:', responseText);
+                    showStatusMulti(`Server error: ${responseText || e.message}`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                
+                if (response.ok && data.success) {
+                    const message = `Success! Batch submitted with ${data.total_jobs} jobs. Batch ID: ${data.batch_id}`;
+                    showStatusMulti(message, 'success');
+                    
+                    // Redirect to browse page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = 'browse.html';
+                    }, 2000);
+                } else {
+                    showStatusMulti(`Error: ${data.detail || 'Batch submission failed'}`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                }
+                
+            } catch (error) {
+                console.error('Batch submission error:', error);
+                showStatusMulti(`Error: ${error.message}`, 'error');
+                multiSubmitBtn.disabled = false;
+                multiSubmitBtn.textContent = 'Submit Multiple Files';
+            }
+        });
+        
+        function showStatusMulti(message, type) {
+            multiStatusMessage.textContent = message;
+            multiStatusMessage.className = `status-message ${type}`;
+            multiStatusMessage.style.display = 'block';
+        }
     </script>
 </body>
+</html>
 </html>

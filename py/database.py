@@ -21,6 +21,7 @@ class Job(Base):
     __tablename__ = 'jobs'
     
     job_id = Column(String, primary_key=True)
+    batch_id = Column(String, nullable=True, index=True)  # UUID for batch submissions, NULL for single jobs
     email = Column(String, nullable=False, index=True)
     job_name = Column(String, nullable=False)
     uniprot_id = Column(String, nullable=True)
@@ -29,7 +30,7 @@ class Job(Base):
     rcsb_pdb_id = Column(String, nullable=True, index=True)
     upload_timestamp = Column(DateTime, nullable=False, default=datetime.utcnow)
     completion_timestamp = Column(DateTime, nullable=True)
-    status = Column(String, nullable=False, default='pending')  # pending, processing, completed, failed
+    status = Column(String, nullable=False, default='pending')  # pending, processing, completed, failed, queued
     error_message = Column(Text, nullable=True)
     num_entanglements = Column(Integer, nullable=True)
     num_hq_entanglements = Column(Integer, nullable=True)
@@ -41,6 +42,9 @@ class Job(Base):
     structure_type = Column(String, nullable=True, default='EXP')  # EXP or AF
     ent_detection_method = Column(Integer, nullable=True, default=3)  # 1=GLN, 2=TLN, 3=Consensus
     generate_features = Column(Boolean, nullable=False, default=False)  # Whether to generate entanglement features
+    estimated_size = Column(Integer, nullable=True)  # Estimated file size in bytes for queue prioritization
+    queue_priority = Column(Integer, nullable=True)  # Priority level for queue (0=high, 2=low)
+    queue_position = Column(Integer, nullable=True)  # Position in queue when queued
     
     # Relationship to results
     results = relationship("Result", back_populates="job", cascade="all, delete-orphan")
@@ -52,6 +56,7 @@ class Job(Base):
         """Convert to dictionary for JSON serialization"""
         data = {
             'job_id': self.job_id,
+            'batch_id': self.batch_id,
             'job_name': self.job_name,
             'uniprot_id': self.uniprot_id,
             'description': self.description,
@@ -70,7 +75,10 @@ class Job(Base):
             'skipped_chains': json.loads(self.skipped_chains) if self.skipped_chains else [],
             'structure_type': self.structure_type,
             'ent_detection_method': self.ent_detection_method,
-            'generate_features': self.generate_features
+            'generate_features': self.generate_features,
+            'estimated_size': self.estimated_size,
+            'queue_priority': self.queue_priority,
+            'queue_position': self.queue_position
         }
         if include_email:
             data['email'] = self.email
@@ -344,12 +352,13 @@ class Database:
         """Get a new database session"""
         return self.Session()
     
-    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False, rcsb_pdb_id=None, structure_type='EXP', ent_detection_method=3, generate_features=False):
+    def create_job(self, email, job_name, pdb_filename, uniprot_id=None, description=None, coarse_grained=False, ca_contact=False, rcsb_pdb_id=None, structure_type='EXP', ent_detection_method=3, generate_features=False, batch_id=None, estimated_size=None, queue_priority=None, queue_position=None):
         """Create a new job entry"""
         session = self.get_session()
         try:
             job = Job(
                 job_id=str(uuid.uuid4()),
+                batch_id=batch_id,
                 email=email,
                 job_name=job_name,
                 pdb_filename=pdb_filename,
@@ -361,7 +370,10 @@ class Database:
                 rcsb_pdb_id=rcsb_pdb_id,
                 structure_type=structure_type,
                 ent_detection_method=ent_detection_method,
-                generate_features=generate_features
+                generate_features=generate_features,
+                estimated_size=estimated_size,
+                queue_priority=queue_priority,
+                queue_position=queue_position
             )
             session.add(job)
             session.commit()
@@ -743,7 +755,59 @@ class Database:
             return session.query(Job).count()
         finally:
             session.close()
+    
+    def get_batch_jobs(self, batch_id):
+        """Get all jobs in a batch"""
+        session = self.get_session()
+        try:
+            jobs = session.query(Job).filter_by(batch_id=batch_id).all()
+            return [j.to_dict(include_email=False) for j in jobs]
+        finally:
+            session.close()
+    
+    def get_batch_status(self, batch_id):
+        """Get aggregated status for a batch"""
+        session = self.get_session()
+        try:
+            jobs = session.query(Job).filter_by(batch_id=batch_id).all()
+            
+            if not jobs:
+                return None
+            
+            statuses = {}
+            for job in jobs:
+                status = job.status
+                statuses[status] = statuses.get(status, 0) + 1
+            
+            total_entanglements = sum(job.num_entanglements or 0 for job in jobs)
+            total_hq_entanglements = sum(job.num_hq_entanglements or 0 for job in jobs)
+            total_clustered = sum(job.num_clustered_entanglements or 0 for job in jobs)
+            
+            return {
+                'batch_id': batch_id,
+                'total_jobs': len(jobs),
+                'status_breakdown': statuses,
+                'total_entanglements': total_entanglements,
+                'total_hq_entanglements': total_hq_entanglements,
+                'total_clustered_entanglements': total_clustered,
+                'jobs': [j.to_dict(include_email=False) for j in jobs]
+            }
+        finally:
+            session.close()
+    
+    def update_job_queue_info(self, job_id, queue_priority, queue_position):
+        """Update queue priority and position for a job"""
+        session = self.get_session()
+        try:
+            job = session.query(Job).filter_by(job_id=job_id).first()
+            if job:
+                job.queue_priority = queue_priority
+                job.queue_position = queue_position
+                session.commit()
+        finally:
+            session.close()
 
 
-# Initialize database instance
+# Create global database instance
 db = Database()
+

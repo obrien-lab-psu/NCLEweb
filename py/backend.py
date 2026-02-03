@@ -8,12 +8,13 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTa
 from fastapi.responses import PlainTextResponse, JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 import tempfile
 import os
 import shutil
 import sys
 import re
+import json
 import requests
 import pandas as pd
 from pathlib import Path
@@ -43,6 +44,8 @@ with open('/tmp/backend_entdetect_debug.log', 'a') as f:
 from api_wrapper import calculate_native_ge
 from database import db, Job, Result, HQResult, ClusteredResult
 from email_notifier import email_notifier
+from job_queue import get_queue_manager
+from batch_submission import create_batch_jobs, get_batch_download_zip
 
 
 def split_combined_crossings(hq_results: list) -> list:
@@ -903,6 +906,270 @@ async def download_job_results(job_id: str):
         print(f"Error downloading results for job {job_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Error downloading results: {str(e)}")
 
+
+# ============================================================================
+# BATCH SUBMISSION ENDPOINTS
+# ============================================================================
+
+@app.post("/api/submit-batch-multiple")
+async def submit_batch_multiple(
+    email: str = Form(...),
+    batch_name: str = Form(...),
+    organism: str = Form("Ecoli"),
+    structure_type: str = Form("EXP"),
+    coarse_grained: bool = Form(False),
+    ca_contact: bool = Form(False),
+    cluster_cutoff: Optional[int] = Form(None),
+    ent_detection_method: int = Form(3),
+    uniprot_id: Optional[str] = Form(None),
+    uniprot_ids: Optional[str] = Form(None),
+    generate_features: bool = Form(False),
+    files: List[UploadFile] = File(...)
+):
+    """
+    Submit multiple PDB files with the same parameters.
+    
+    Parameters
+    ----------
+    email : str
+        User's email for notifications
+    batch_name : str
+        Name for this batch submission
+    organism : str
+        Organism for clustering
+    structure_type : str
+        Structure type: "EXP" or "AF"
+    coarse_grained : bool
+        Whether to use coarse-grained (C-alpha only) structures
+    ca_contact : bool
+        Whether to use C-alpha contacts
+    cluster_cutoff : int, optional
+        Custom clustering cutoff
+    ent_detection_method : int
+        Entanglement detection method (1, 2, or 3)
+    uniprot_id : str, optional
+        UniProt ID for feature generation
+    generate_features : bool
+        Whether to generate entanglement features
+    files : List[UploadFile]
+        PDB files to analyze
+        
+    Returns
+    -------
+    JSONResponse
+        Batch ID and list of job IDs
+    """
+    
+    # Validate inputs
+    if not validate_email(email):
+        raise HTTPException(status_code=400, detail="Invalid email address")
+    
+    if not batch_name or len(batch_name.strip()) == 0:
+        raise HTTPException(status_code=400, detail="Batch name is required")
+    
+    if not files or len(files) == 0:
+        raise HTTPException(status_code=400, detail="At least one PDB file is required")
+    
+    if len(files) > 100:
+        raise HTTPException(status_code=400, detail="Maximum 100 files per batch")
+    
+    # Check if generate_features requires UniProt IDs
+    if generate_features:
+        has_uniprot = False
+        if uniprot_id:  # Legacy single UniProt ID
+            has_uniprot = True
+        elif uniprot_ids:  # Per-file UniProt IDs
+            try:
+                per_file_ids = json.loads(uniprot_ids)
+                # Check if at least one file has a UniProt ID
+                has_uniprot = any(per_file_ids.get(file.filename, '').strip() for file in files)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        if not has_uniprot:
+            raise HTTPException(status_code=400, detail="UniProt ID is required when generating features")
+    
+    # Auto-enable C-alpha contacts for AlphaFold
+    if structure_type.upper() == 'AF' and not ca_contact and not coarse_grained:
+        ca_contact = True
+    
+    # Read all PDB files
+    MAX_SIZE = 20 * 1024 * 1024  # 20 MB per file
+    pdb_files = {}
+    
+    try:
+        for file in files:
+            if not file.filename.endswith('.pdb'):
+                raise HTTPException(status_code=400, detail=f"Invalid file: {file.filename}. Only .pdb files accepted")
+            
+            contents = await file.read()
+            if len(contents) > MAX_SIZE:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File {file.filename} too large. Maximum 20 MB per file"
+                )
+            
+            pdb_files[file.filename] = contents
+        
+        # Create parameter list (all files use same params)
+        params_list = []
+        for filename in pdb_files.keys():
+            params_list.append({
+                'pdb_filename': filename,
+                'organism': organism,
+                'coarse_grained': coarse_grained,
+                'ca_contact': ca_contact,
+                'structure_type': structure_type,
+                'ent_detection_method': ent_detection_method,
+                'cluster_cutoff': cluster_cutoff
+            })
+        
+        # Parse per-file UniProt IDs if provided
+        per_file_uniprot_ids = {}
+        if uniprot_ids:
+            try:
+                per_file_uniprot_ids = json.loads(uniprot_ids)
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse uniprot_ids JSON: {uniprot_ids}")
+        
+        # Create batch jobs
+        base_url = os.getenv('BASE_URL', 'http://localhost:8000')
+        batch_id, job_ids, errors = create_batch_jobs(
+            email=email.strip(),
+            batch_name=batch_name.strip(),
+            pdb_files=pdb_files,
+            params_list=params_list,
+            base_uniprot_id=uniprot_id.strip() if uniprot_id else None,
+            per_file_uniprot_ids=per_file_uniprot_ids if per_file_uniprot_ids else None,
+            generate_features=generate_features,
+            base_url=base_url,
+            job_processor=process_job_async
+        )
+        
+        if not job_ids:
+            raise HTTPException(status_code=400, detail=f"No jobs created. Errors: {'; '.join(errors)}")
+        
+        return JSONResponse(content={
+            'success': True,
+            'batch_id': batch_id,
+            'job_ids': job_ids,
+            'total_jobs': len(job_ids),
+            'errors': errors if errors else None,
+            'message': f'Batch submission created with {len(job_ids)} jobs'
+        })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating batch: {str(e)}")
+
+
+@app.get("/api/batch/{batch_id}/status")
+async def get_batch_status(batch_id: str):
+    """
+    Get status of a batch submission.
+    
+    Parameters
+    ----------
+    batch_id : str
+        Batch UUID
+        
+    Returns
+    -------
+    JSONResponse
+        Batch status and job information
+    """
+    try:
+        batch_status = db.get_batch_status(batch_id)
+        
+        if not batch_status:
+            raise HTTPException(status_code=404, detail=f"Batch {batch_id} not found")
+        
+        # Add queue information
+        queue_manager = get_queue_manager()
+        queue_info = queue_manager.get_batch_status(batch_id)
+        
+        return JSONResponse(content={
+            'success': True,
+            'batch_id': batch_id,
+            'status': batch_status,
+            'queue': queue_info
+        })
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching batch status: {str(e)}")
+
+
+@app.get("/api/batch/{batch_id}/download")
+async def download_batch_results(batch_id: str):
+    """
+    Download all results for a batch as a ZIP file.
+    
+    Parameters
+    ----------
+    batch_id : str
+        Batch UUID
+        
+    Returns
+    -------
+    StreamingResponse
+        ZIP file containing all results
+    """
+    try:
+        batch_status = db.get_batch_status(batch_id)
+        
+        if not batch_status:
+            raise HTTPException(status_code=404, detail=f"Batch {batch_id} not found")
+        
+        # Check if all jobs are completed
+        pending = batch_status['status_breakdown'].get('pending', 0)
+        processing = batch_status['status_breakdown'].get('processing', 0)
+        queued = batch_status['status_breakdown'].get('queued', 0)
+        
+        if pending > 0 or processing > 0 or queued > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Batch not complete. Pending: {pending}, Processing: {processing}, Queued: {queued}"
+            )
+        
+        # Create ZIP with results
+        zip_data = get_batch_download_zip(batch_id)
+        
+        return StreamingResponse(
+            iter([zip_data]),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=ncle_batch_{batch_id[:8]}.zip"}
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error downloading batch results: {str(e)}")
+
+
+@app.get("/api/queue/status")
+async def get_queue_status():
+    """
+    Get current queue status (useful for monitoring).
+    
+    Returns
+    -------
+    JSONResponse
+        Queue statistics
+    """
+    try:
+        queue_manager = get_queue_manager()
+        queue_status = queue_manager.get_queue_status()
+        
+        return JSONResponse(content={
+            'success': True,
+            'queue_status': queue_status
+        })
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching queue status: {str(e)}")
 
 
 if __name__ == "__main__":

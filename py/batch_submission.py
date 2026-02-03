@@ -224,6 +224,8 @@ def create_batch_jobs(
         
         # Extract per-file generate_features flag
         file_generate_features = file_opts.get('generate_features', generate_features)
+        # DEBUG: Log generate_features for each file
+        print(f"DEBUG: File {pdb_filename}: generate_features={file_generate_features}, file_opts keys: {list(file_opts.keys())}")
         
         # Handle model_resolution conversion (from frontend string to backend boolean)
         model_resolution = file_opts.get('model_resolution', base_params.get('model_resolution', 'all-atom'))

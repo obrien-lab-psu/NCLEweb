@@ -924,6 +924,7 @@ async def submit_batch_multiple(
     uniprot_id: Optional[str] = Form(None),
     uniprot_ids: Optional[str] = Form(None),
     generate_features: bool = Form(False),
+    per_file_options: Optional[str] = Form(None),
     files: List[UploadFile] = File(...)
 ):
     """
@@ -949,8 +950,12 @@ async def submit_batch_multiple(
         Entanglement detection method (1, 2, or 3)
     uniprot_id : str, optional
         UniProt ID for feature generation
+    uniprot_ids : str, optional
+        JSON string mapping filenames to UniProt IDs
     generate_features : bool
         Whether to generate entanglement features
+    per_file_options : str, optional
+        JSON string mapping filenames to per-file options
     files : List[UploadFile]
         PDB files to analyze
         
@@ -1011,19 +1016,6 @@ async def submit_batch_multiple(
             
             pdb_files[file.filename] = contents
         
-        # Create parameter list (all files use same params)
-        params_list = []
-        for filename in pdb_files.keys():
-            params_list.append({
-                'pdb_filename': filename,
-                'organism': organism,
-                'coarse_grained': coarse_grained,
-                'ca_contact': ca_contact,
-                'structure_type': structure_type,
-                'ent_detection_method': ent_detection_method,
-                'cluster_cutoff': cluster_cutoff
-            })
-        
         # Parse per-file UniProt IDs if provided
         per_file_uniprot_ids = {}
         if uniprot_ids:
@@ -1032,15 +1024,37 @@ async def submit_batch_multiple(
             except (json.JSONDecodeError, TypeError):
                 logger.warning(f"Could not parse uniprot_ids JSON: {uniprot_ids}")
         
+        # Parse per-file options if provided
+        per_file_opts = {}
+        if per_file_options:
+            try:
+                per_file_opts = json.loads(per_file_options)
+                print(f"DEBUG backend: per_file_opts parsed: {list(per_file_opts.keys())}")
+                for fname, opts in per_file_opts.items():
+                    print(f"DEBUG backend:   {fname}: generate_features={opts.get('generate_features', 'NOT FOUND')}, keys={list(opts.keys())}")
+            except (json.JSONDecodeError, TypeError):
+                logger.warning(f"Could not parse per_file_options JSON: {per_file_options}")
+        
+        # Create base parameters
+        base_params = {
+            'organism': organism,
+            'coarse_grained': coarse_grained,
+            'ca_contact': ca_contact,
+            'structure_type': structure_type,
+            'ent_detection_method': ent_detection_method,
+            'cluster_cutoff': cluster_cutoff
+        }
+        
         # Create batch jobs
         base_url = os.getenv('BASE_URL', 'http://localhost:8000')
         batch_id, job_ids, errors = create_batch_jobs(
             email=email.strip(),
             batch_name=batch_name.strip(),
             pdb_files=pdb_files,
-            params_list=params_list,
             base_uniprot_id=uniprot_id.strip() if uniprot_id else None,
             per_file_uniprot_ids=per_file_uniprot_ids if per_file_uniprot_ids else None,
+            per_file_options=per_file_opts if per_file_opts else None,
+            base_params=base_params,
             generate_features=generate_features,
             base_url=base_url,
             job_processor=process_job_async

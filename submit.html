@@ -619,230 +619,11 @@
                 <small id="multiUniprotListHelp">Optional: Enter a UniProt Accession ID for each file. Leave blank if not needed. <strong id="multiUniprotListRequiredText" style="display: none;">Required if generating features.</strong></small>
             </div>
             
-            <div class="form-group">
-                <label>
-                    Structure Type <span class="required">*</span>
-                </label>
-                <div style="display: flex; gap: 20px; margin-top: 10px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiStructureTypeExp" 
-                            name="multiStructureType" 
-                            value="EXP" 
-                            checked
-                            style="margin-right: 8px;"
-                        >
-                        <span>Experimental (PDB)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiStructureTypeAF" 
-                            name="multiStructureType" 
-                            value="AF"
-                            style="margin-right: 8px;"
-                        >
-                        <span>AlphaFold (AF)</span>
-                    </label>
-                </div>
-                <small>Select whether all structures are experimental or AlphaFold predicted</small>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    Organism <span class="required">*</span>
-                </label>
-                <div style="display: flex; gap: 20px; margin-top: 10px; flex-wrap: wrap;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiOrganismEcoli" 
-                            name="multiOrganism" 
-                            value="Ecoli" 
-                            checked
-                            style="margin-right: 8px;"
-                            onchange="toggleMultiCustomOrganism()"
-                        >
-                        <span>E. coli (cutoff: 57)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiOrganismHuman" 
-                            name="multiOrganism" 
-                            value="Human"
-                            style="margin-right: 8px;"
-                            onchange="toggleMultiCustomOrganism()"
-                        >
-                        <span>Human (cutoff: 52)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiOrganismYeast" 
-                            name="multiOrganism" 
-                            value="Yeast"
-                            style="margin-right: 8px;"
-                            onchange="toggleMultiCustomOrganism()"
-                        >
-                        <span>Yeast (cutoff: 49)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiOrganismCustom" 
-                            name="multiOrganism" 
-                            value="Custom"
-                            style="margin-right: 8px;"
-                            onchange="toggleMultiCustomOrganism()"
-                        >
-                        <span>Custom</span>
-                    </label>
-                </div>
-                <small>Select the organism for clustering analysis</small>
-            </div>
-            
-            <div class="form-group" id="multiCustomOrganismFields" style="display: none;">
-                <label>
-                    Custom Organism Name <span class="required">*</span>
-                </label>
-                <input 
-                    type="text" 
-                    id="multiCustomOrganismName" 
-                    placeholder="e.g., Mouse, Zebrafish, etc."
-                >
-                <small>Enter the organism name for your structures</small>
-            </div>
-            
-            <div class="form-group" id="multiCustomCutoffField" style="display: none;">
-                <label>
-                    Custom Clustering Cutoff <span class="required">*</span>
-                </label>
-                <input 
-                    type="number" 
-                    id="multiCustomCutoff" 
-                    placeholder="e.g., 50"
-                    min="1"
-                    step="1"
-                >
-                <small>Enter the distance cutoff for clustering (typical range: 45-60)</small>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    Model Resolution <span class="required">*</span>
-                </label>
-                <div style="display: flex; gap: 20px; margin-top: 10px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiModelResolutionAA" 
-                            name="multiModelResolution" 
-                            value="all-atom" 
-                            checked
-                            style="margin-right: 8px;"
-                        >
-                        <span>All-Atom</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiModelResolutionCG" 
-                            name="multiModelResolution" 
-                            value="ca-cg"
-                            style="margin-right: 8px;"
-                        >
-                        <span>C-alpha Coarse-Grained</span>
-                    </label>
-                </div>
-                <small>For C-alpha CG models, all PDB files must have atom names "A" and residue names "G1", "G2", etc.</small>
-            </div>
-            
-            <div class="form-group">
-                <label>
-                    Contact Type <span class="required">*</span>
-                </label>
-                <div style="display: flex; gap: 20px; margin-top: 10px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiContactTypeHeavy" 
-                            name="multiContactType" 
-                            value="heavy-atom" 
-                            checked
-                            style="margin-right: 8px;"
-                        >
-                        <span>Heavy Atom Contacts</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiContactTypeCa" 
-                            name="multiContactType" 
-                            value="ca-contact"
-                            style="margin-right: 8px;"
-                        >
-                        <span>C-alpha Contacts</span>
-                    </label>
-                </div>
-                <small>Select the type of contacts to use for analysis</small>
-            </div>
-
-            <!-- Detection Method Selection -->
-            <div class="form-group">
-                <label>
-                    Entanglement Detection Method
-                </label>
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiDetectionMethod1" 
-                            name="multiDetectionMethod" 
-                            value="1"
-                            style="margin-right: 8px;"
-                        >
-                        <span><strong>Method 1:</strong> GLN-based (any nonzero Gaussian linking)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiDetectionMethod2" 
-                            name="multiDetectionMethod" 
-                            value="2"
-                            style="margin-right: 8px;"
-                        >
-                        <span><strong>Method 2:</strong> TLN-based (any nonzero topological linking)</span>
-                    </label>
-                    <label style="display: flex; align-items: center; cursor: pointer;">
-                        <input 
-                            type="radio" 
-                            id="multiDetectionMethod3" 
-                            name="multiDetectionMethod" 
-                            value="3"
-                            checked
-                            style="margin-right: 8px;"
-                        >
-                        <span><strong>Method 3:</strong> Consensus (both GLN and TLN must agree) - Recommended</span>
-                    </label>
-                </div>
-                <small>Method used to determine if a non-covalent lasso entanglement is present</small>
-            </div>
-            
-            <!-- Generate NCLE Features Option -->
-            <div class="form-group">
-                <label style="display: flex; align-items: center; cursor: pointer;">
-                    <input 
-                        type="checkbox" 
-                        id="multiGenerateFeatures" 
-                        name="multiGenerateFeatures"
-                        style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;"
-                        onchange="toggleMultiFeaturesRequirement()"
-                    >
-                    <span><strong>Generate Entanglement Features</strong></span>
-                </label>
-                <small>If enabled, additional entanglement features will be calculated for structures that have UniProt IDs. Specify per-file above.</small>
+            <!-- Per-File Options Section -->
+            <div class="form-group" id="multiPerFileOptionsContainer" style="display: none;">
+                <label><strong>Per-File Analysis Options</strong></label>
+                <small style="display: block; margin-bottom: 10px;">Customize analysis parameters for each file. All options must be specified per-file.</small>
+                <div id="multiPerFileOptions" style="margin-top: 10px; padding: 10px; background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; max-height: 400px; overflow-y: auto;"></div>
             </div>
             
             <div class="form-group">
@@ -910,11 +691,14 @@
             const fileList = document.getElementById('multiFileList');
             const multiUniprotListContainer = document.getElementById('multiUniprotListContainer');
             const multiUniprotList = document.getElementById('multiUniprotList');
+            const multiPerFileOptionsContainer = document.getElementById('multiPerFileOptionsContainer');
+            const multiPerFileOptions = document.getElementById('multiPerFileOptions');
             const files = fileInput.files;
             
             if (files.length === 0) {
                 fileList.innerHTML = '<p style="color: #999; margin: 0;">No files selected</p>';
                 multiUniprotListContainer.style.display = 'none';
+                multiPerFileOptionsContainer.style.display = 'none';
                 return;
             }
             
@@ -945,24 +729,77 @@
                 uniprotHtml += '</div>';
             }
             multiUniprotList.innerHTML = uniprotHtml;
+            
+            // Show per-file options
+            multiPerFileOptionsContainer.style.display = 'block';
+            let optionsHtml = '';
+            for (let i = 0; i < files.length; i++) {
+                const fileIdx = i;
+                const fileName = files[i].name;
+                optionsHtml += '<div style="margin-bottom: 15px; padding: 12px; background: white; border: 1px solid #ddd; border-radius: 4px;">';
+                optionsHtml += '<p style="margin: 0 0 10px 0; font-weight: bold; color: #333; cursor: pointer;" onclick="document.getElementById(\'perFileOptions_' + fileIdx + '\').style.display = document.getElementById(\'perFileOptions_' + fileIdx + '\').style.display === \'none\' ? \'block\' : \'none\';">';
+                optionsHtml += '▼ ' + fileName;
+                optionsHtml += '</p>';
+                optionsHtml += '<div id="perFileOptions_' + fileIdx + '" style="display: none; padding-left: 10px; border-left: 3px solid #667eea;">';
+                
+                // Structure Type
+                optionsHtml += '<div style="margin-bottom: 8px;">';
+                optionsHtml += '<label style="font-size: 0.9em; color: #666;">Structure Type (Default: Experimental)</label>';
+                optionsHtml += '<div style="display: flex; gap: 15px; margin-top: 4px;">';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="structureType_' + fileIdx + '" value="EXP" checked> EXP</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="structureType_' + fileIdx + '" value="AF"> AF</label>';
+                optionsHtml += '</div>';
+                optionsHtml += '</div>';
+                
+                // Organism
+                optionsHtml += '<div style="margin-bottom: 8px;">';
+                optionsHtml += '<label style="font-size: 0.9em; color: #666;">Organism (Default: E. coli)</label>';
+                optionsHtml += '<div style="display: flex; gap: 10px; margin-top: 4px; flex-wrap: wrap;">';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="organism_' + fileIdx + '" value="Ecoli" checked> E. coli</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="organism_' + fileIdx + '" value="Human"> Human</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="organism_' + fileIdx + '" value="Yeast"> Yeast</label>';
+                optionsHtml += '</div>';
+                optionsHtml += '</div>';
+                
+                // Model Resolution
+                optionsHtml += '<div style="margin-bottom: 8px;">';
+                optionsHtml += '<label style="font-size: 0.9em; color: #666;">Model Resolution (Default: All-Atom)</label>';
+                optionsHtml += '<div style="display: flex; gap: 15px; margin-top: 4px;">';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="modelResolution_' + fileIdx + '" value="all-atom" checked> All-Atom</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="modelResolution_' + fileIdx + '" value="ca-cg"> C-alpha CG</label>';
+                optionsHtml += '</div>';
+                optionsHtml += '</div>';
+                
+                // Contact Type
+                optionsHtml += '<div style="margin-bottom: 8px;">';
+                optionsHtml += '<label style="font-size: 0.9em; color: #666;">Contact Type (Default: Heavy Atom)</label>';
+                optionsHtml += '<div style="display: flex; gap: 15px; margin-top: 4px;">';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="contactType_' + fileIdx + '" value="heavy-atom" checked> Heavy Atom</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="contactType_' + fileIdx + '" value="ca-contact"> C-alpha</label>';
+                optionsHtml += '</div>';
+                optionsHtml += '</div>';
+                
+                // Detection Method
+                optionsHtml += '<div style="margin-bottom: 8px;">';
+                optionsHtml += '<label style="font-size: 0.9em; color: #666;">Detection Method (Default: Method 3)</label>';
+                optionsHtml += '<div style="display: flex; gap: 10px; margin-top: 4px; flex-direction: column;">';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="detectionMethod_' + fileIdx + '" value="1"> Method 1 (GLN)</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="detectionMethod_' + fileIdx + '" value="2"> Method 2 (TLN)</label>';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="radio" name="detectionMethod_' + fileIdx + '" value="3" checked> Method 3 (Consensus)</label>';
+                optionsHtml += '</div>';
+                optionsHtml += '</div>';
+                
+                // Generate Features
+                optionsHtml += '<div style="margin-bottom: 0;">';
+                optionsHtml += '<label style="font-size: 0.85em;"><input type="checkbox" name="generateFeatures_' + fileIdx + '" value="true"> Generate Features (if UniProt provided)</label>';
+                optionsHtml += '</div>';
+                
+                optionsHtml += '</div>';
+                optionsHtml += '</div>';
+            }
+            multiPerFileOptions.innerHTML = optionsHtml;
         }
         
-        function toggleMultiFeaturesRequirement() {
-            const generateFeatures = document.getElementById('multiGenerateFeatures').checked;
-            const multiUniprotListRequired = document.getElementById('multiUniprotListRequired');
-            const multiUniprotListRequiredText = document.getElementById('multiUniprotListRequiredText');
-            const multiUniprotListHelp = document.getElementById('multiUniprotListHelp');
-            
-            if (generateFeatures) {
-                multiUniprotListRequired.style.display = 'inline';
-                multiUniprotListRequiredText.style.display = 'inline';
-                multiUniprotListHelp.innerHTML = '<strong>Required:</strong> At least one UniProt Accession ID must be provided to generate entanglement features.';
-            } else {
-                multiUniprotListRequired.style.display = 'none';
-                multiUniprotListRequiredText.style.display = 'none';
-                multiUniprotListHelp.innerHTML = 'Optional: Enter a UniProt Accession ID for each file. Leave blank if not needed. <strong id="multiUniprotListRequiredText" style="display: none;">Required if generating features.</strong>';
-            }
-        }
         
         function toggleInputType() {
             const isFile = document.getElementById('inputTypeFile').checked;
@@ -1273,92 +1110,96 @@
                 formData.append('files', files[i]);
             }
             
-            // Get model resolution and contact type
-            const modelResolution = document.querySelector('input[name="multiModelResolution"]:checked').value;
-            const contactType = document.querySelector('input[name="multiContactType"]:checked').value;
-            const detectionMethod = document.querySelector('input[name="multiDetectionMethod"]:checked').value;
-            const isCaCG = (modelResolution === 'ca-cg');
-            const useCaContact = (contactType === 'ca-contact');
+            // Get default values
+            const defaultStructureType = 'EXP';
+            const defaultModelResolution = 'all-atom';
+            const defaultContactType = 'heavy-atom';
+            const defaultDetectionMethod = '3';
+            const generateFeatures = false;
             
-            // Validate combination: CG model cannot use heavy atom contacts
-            if (isCaCG && !useCaContact) {
-                showStatusMulti('Invalid combination: C-alpha Coarse-Grained models must use C-alpha Contacts (not Heavy Atom Contacts)', 'error');
-                multiSubmitBtn.disabled = false;
-                multiSubmitBtn.textContent = 'Submit Multiple Files';
-                return;
-            }
-            
-            // Check if generating features requires UniProt ID
-            const generateFeatures = document.getElementById('multiGenerateFeatures').checked;
-            
-            // Collect per-file UniProt IDs
-            const uniprotIds = {};
-            const uniprotInputs = document.querySelectorAll('.multiUniprotInput');
+            // Collect per-file options
+            const perFileOptions = {};
             let hasAnyUniprot = false;
+            const uniprotIds = {};
             
             for (let i = 0; i < files.length; i++) {
+                const fileName = files[i].name;
+                
+                // Get per-file UniProt ID
                 const inputId = 'multiUniprot_' + i;
                 const input = document.getElementById(inputId);
+                let uniprotId = '';
                 if (input) {
-                    const uniprotId = input.value.trim();
+                    uniprotId = input.value.trim();
                     if (uniprotId) {
-                        uniprotIds[files[i].name] = uniprotId;
+                        uniprotIds[fileName] = uniprotId;
                         hasAnyUniprot = true;
                     }
                 }
+                
+                // Get per-file options (REQUIRED - no defaults)
+                const structureTypeRadio = document.querySelector('input[name="structureType_' + i + '"]:checked');
+                const organismRadio = document.querySelector('input[name="organism_' + i + '"]:checked');
+                const modelResolutionRadio = document.querySelector('input[name="modelResolution_' + i + '"]:checked');
+                const contactTypeRadio = document.querySelector('input[name="contactType_' + i + '"]:checked');
+                const detectionMethodRadio = document.querySelector('input[name="detectionMethod_' + i + '"]:checked');
+                const genFeaturesCheckbox = document.querySelector('input[name="generateFeatures_' + i + '"]');
+                
+                // Validate that all per-file options are specified
+                if (!structureTypeRadio) {
+                    showStatusMulti(`File "${fileName}": Structure Type must be specified`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                if (!organismRadio) {
+                    showStatusMulti(`File "${fileName}": Organism must be specified`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                if (!modelResolutionRadio) {
+                    showStatusMulti(`File "${fileName}": Model Resolution must be specified`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                if (!contactTypeRadio) {
+                    showStatusMulti(`File "${fileName}": Contact Type must be specified`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                if (!detectionMethodRadio) {
+                    showStatusMulti(`File "${fileName}": Entanglement Detection Method must be specified`, 'error');
+                    multiSubmitBtn.disabled = false;
+                    multiSubmitBtn.textContent = 'Submit Multiple Files';
+                    return;
+                }
+                
+                // Store per-file options
+                perFileOptions[fileName] = {
+                    structure_type: structureTypeRadio.value,
+                    model_resolution: modelResolutionRadio.value,
+                    contact_type: contactTypeRadio.value,
+                    organism: organismRadio.value,
+                    detection_method: detectionMethodRadio.value,
+                    uniprot_id: uniprotId,
+                    generate_features: genFeaturesCheckbox ? genFeaturesCheckbox.checked : false
+                };
             }
             
-            // Validate: if generating features, at least one UniProt ID must be provided
-            if (generateFeatures && !hasAnyUniprot) {
-                showStatusMulti('At least one UniProt Accession ID is required when generating entanglement features', 'error');
-                multiSubmitBtn.disabled = false;
-                multiSubmitBtn.textContent = 'Submit Multiple Files';
-                return;
-            }
+            // Collect base parameters from per-file options (for backward compatibility)
+            const firstFile = Object.keys(perFileOptions)[0];
+            const firstFileOptions = perFileOptions[firstFile];
             
-            // Append per-file UniProt IDs to form data
+            // Append per-file options to form data
             formData.append('uniprot_ids', JSON.stringify(uniprotIds));
+            formData.append('per_file_options', JSON.stringify(perFileOptions));
             
-            const structureType = document.querySelector('input[name="multiStructureType"]:checked').value;
-            formData.append('structure_type', structureType);
-            
-            // Handle organism and cutoff
-            const organismRadio = document.querySelector('input[name="multiOrganism"]:checked').value;
-            if (organismRadio === 'Custom') {
-                const customOrganism = document.getElementById('multiCustomOrganismName').value.trim();
-                const customCutoff = document.getElementById('multiCustomCutoff').value;
-                
-                if (!customOrganism) {
-                    showStatusMulti('Please enter a custom organism name', 'error');
-                    multiSubmitBtn.disabled = false;
-                    multiSubmitBtn.textContent = 'Submit Multiple Files';
-                    return;
-                }
-                
-                if (!customCutoff || customCutoff < 1) {
-                    showStatusMulti('Please enter a valid clustering cutoff (minimum 1)', 'error');
-                    multiSubmitBtn.disabled = false;
-                    multiSubmitBtn.textContent = 'Submit Multiple Files';
-                    return;
-                }
-                
-                formData.append('organism', customOrganism);
-                formData.append('cluster_cutoff', customCutoff);
-            } else {
-                formData.append('organism', organismRadio);
-            }
-            
-            // Only append boolean flags if true to avoid form parsing issues
-            if (isCaCG) {
-                formData.append('coarse_grained', 'on');
-            }
-            if (useCaContact) {
-                formData.append('ca_contact', 'on');
-            }
-            if (generateFeatures) {
-                formData.append('generate_features', 'on');
-            }
-            formData.append('ent_detection_method', detectionMethod);
+            // Append base values for compatibility (from first file's options)
+            formData.append('structure_type', firstFileOptions.structure_type);
+            formData.append('organism', firstFileOptions.organism);
             
             try {
                 showStatusMulti('Uploading and submitting batch...', 'info');

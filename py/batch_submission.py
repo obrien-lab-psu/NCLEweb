@@ -157,9 +157,10 @@ def create_batch_jobs(
     email: str,
     batch_name: str,
     pdb_files: Dict[str, bytes],
-    params_list: List[Dict],
     base_uniprot_id: Optional[str] = None,
     per_file_uniprot_ids: Optional[Dict[str, str]] = None,
+    per_file_options: Optional[Dict[str, Dict]] = None,
+    base_params: Optional[Dict] = None,
     generate_features: bool = False,
     base_url: str = None,
     job_processor: Optional[Callable] = None
@@ -175,10 +176,14 @@ def create_batch_jobs(
         Name for the batch
     pdb_files : dict
         Map of pdb_filename -> file_content
-    params_list : list
-        List of parameter dictionaries from params.csv
     base_uniprot_id : str, optional
-        Optional uniprot ID for feature generation
+        Optional base uniprot ID for feature generation
+    per_file_uniprot_ids : dict, optional
+        Map of pdb_filename -> uniprot_id
+    per_file_options : dict, optional
+        Map of pdb_filename -> {structure_type, organism, coarse_grained, ca_contact, ent_detection_method, cluster_cutoff}
+    base_params : dict, optional
+        Base parameters for all files (organism, structure_type, etc.)
     generate_features : bool
         Whether to generate features
     base_url : str, optional
@@ -197,13 +202,51 @@ def create_batch_jobs(
     errors = []
     queue_manager = get_queue_manager()
     
-    for params in params_list:
-        pdb_filename = params['pdb_filename']
+    # Use default base parameters if not provided
+    if base_params is None:
+        base_params = {
+            'organism': 'Ecoli',
+            'coarse_grained': False,
+            'ca_contact': False,
+            'structure_type': 'EXP',
+            'ent_detection_method': 3,
+            'cluster_cutoff': None
+        }
+    
+    for pdb_filename in pdb_files.keys():
+        # Get per-file options, falling back to base parameters
+        file_opts = per_file_options.get(pdb_filename, {}) if per_file_options else {}
         
-        # Check if PDB file exists in submission
-        if pdb_filename not in pdb_files:
-            errors.append(f"PDB file '{pdb_filename}' specified in params.csv but not found in ZIP")
-            continue
+        structure_type = file_opts.get('structure_type', base_params.get('structure_type', 'EXP'))
+        organism = file_opts.get('organism', base_params.get('organism', 'Ecoli'))
+        ent_detection_method = file_opts.get('detection_method', file_opts.get('ent_detection_method', base_params.get('ent_detection_method', 3)))
+        cluster_cutoff = file_opts.get('cluster_cutoff', base_params.get('cluster_cutoff'))
+        
+        # Extract per-file generate_features flag
+        file_generate_features = file_opts.get('generate_features', generate_features)
+        
+        # Handle model_resolution conversion (from frontend string to backend boolean)
+        model_resolution = file_opts.get('model_resolution', base_params.get('model_resolution', 'all-atom'))
+        coarse_grained = (model_resolution == 'ca-cg') if isinstance(model_resolution, str) else base_params.get('coarse_grained', False)
+        
+        # Handle contact_type conversion (from frontend string to backend boolean)
+        contact_type = file_opts.get('contact_type', base_params.get('contact_type', 'heavy-atom'))
+        ca_contact = (contact_type == 'ca-contact') if isinstance(contact_type, str) else base_params.get('ca_contact', False)
+        
+        # Also check for direct boolean values (in case they're already converted)
+        if 'coarse_grained' in file_opts:
+            coarse_grained = file_opts['coarse_grained']
+        elif 'coarse_grained' in base_params:
+            coarse_grained = base_params['coarse_grained']
+            
+        if 'ca_contact' in file_opts:
+            ca_contact = file_opts['ca_contact']
+        elif 'ca_contact' in base_params:
+            ca_contact = base_params['ca_contact']
+        
+        # Auto-enable C-alpha contacts for AlphaFold
+        if structure_type.upper() == 'AF' and not ca_contact and not coarse_grained:
+            ca_contact = True
         
         try:
             pdb_content = pdb_files[pdb_filename]
@@ -225,11 +268,11 @@ def create_batch_jobs(
                 pdb_filename=pdb_filename,
                 uniprot_id=file_uniprot_id,
                 description=f"Batch submission: {batch_name}",
-                coarse_grained=params['coarse_grained'],
-                ca_contact=params['ca_contact'],
-                structure_type=params['structure_type'],
-                ent_detection_method=params['ent_detection_method'],
-                generate_features=generate_features,
+                coarse_grained=coarse_grained,
+                ca_contact=ca_contact,
+                structure_type=structure_type,
+                ent_detection_method=ent_detection_method,
+                generate_features=file_generate_features,
                 batch_id=batch_id,
                 estimated_size=file_size
             )
@@ -263,14 +306,14 @@ def create_batch_jobs(
                         job_id=job_id,
                         temp_pdb_path=temp_pdb_path,
                         base_url=base_url or 'http://localhost:8000',
-                        structure_type=params['structure_type'],
-                        organism=params.get('organism', 'Ecoli'),
-                        coarse_grained=params.get('coarse_grained', False),
-                        ca_contact=params.get('ca_contact', False),
-                        cluster_cutoff=params.get('cluster_cutoff'),
-                        ent_detection_method=params.get('ent_detection_method', 3),
+                        structure_type=structure_type,
+                        organism=organism,
+                        coarse_grained=coarse_grained,
+                        ca_contact=ca_contact,
+                        cluster_cutoff=cluster_cutoff,
+                        ent_detection_method=ent_detection_method,
                         uniprot_id=file_uniprot_id,
-                        generate_features=generate_features
+                        generate_features=file_generate_features
                     ))
                 except Exception as e:
                     # Log but don't fail - job will be picked up by background processing

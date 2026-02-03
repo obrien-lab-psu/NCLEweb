@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentation - NCLE</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .doc-container {
+            max-width: 1000px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .doc-nav {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .doc-nav a {
+            padding: 10px 15px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            transition: background 0.3s;
+        }
+        
+        .doc-nav a:hover {
+            background: #5568d3;
+        }
+        
+        .doc-section {
+            background: white;
+            padding: 30px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .doc-section h2 {
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        
+        .doc-section h3 {
+            color: #2c3e50;
+            margin-top: 20px;
+        }
+        
+        .doc-section p {
+            line-height: 1.8;
+            color: #333;
+        }
+        
+        .equation {
+            background: #f5f5f5;
+            padding: 15px;
+            border-left: 4px solid #667eea;
+            margin: 15px 0;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        
+        .figure {
+            background: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .figure p {
+            font-style: italic;
+            color: #666;
+            margin: 10px 0 0 0;
+        }
+        
+        .highlights {
+            background: #f0f4ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        
+        .highlights ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .highlights li {
+            margin: 8px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        
+        table th, table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: left;
+        }
+        
+        table th {
+            background: #667eea;
+            color: white;
+        }
+        
+        table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="doc-container">
+        <h1 style="color: #667eea; border-bottom: 3px solid #667eea; padding-bottom: 20px;">NCLE Documentation</h1>
+        
+        <div class="doc-nav">
+            <a href="#theory">Theory</a>
+            <a href="#methods">Methods</a>
+            <a href="#usage">Usage Guide</a>
+            <a href="#features">Features</a>
+            <a href="#faq">FAQ</a>
+        </div>
+        
+        <div class="doc-section" id="theory">
+            <h2>Theory: Native Gaussian Entanglement</h2>
+            
+            <h3>What is Protein Entanglement?</h3>
+            <p>
+                Protein entanglement refers to topological knots and complex linking patterns within the three-dimensional backbone 
+                of protein structures. These entanglements are distinct from simple geometric knots and involve the deep threading 
+                of the protein chain through itself. Understanding protein entanglement is crucial for:
+            </p>
+            
+            <div class="highlights">
+                <ul>
+                    <li><strong>Protein Folding:</strong> Entanglements may play a role in protein folding kinetics and stability</li>
+                    <li><strong>Functional Design:</strong> Some proteins use entanglement for mechanical strength or specialized functions</li>
+                    <li><strong>Evolution:</strong> Studying how entanglement patterns are conserved across species</li>
+                    <li><strong>Structure Prediction:</strong> Improving computational models of protein structure</li>
+                </ul>
+            </div>
+            
+            <h3>Gaussian Entanglement Definition</h3>
+            <p>
+                Native Gaussian Entanglement (GE) is a method for detecting and quantifying protein entanglement based on the 
+                Gaussian linking number. The Gaussian linking number is a topological invariant that measures how many times 
+                two curves wind around each other in 3D space.
+            </p>
+            
+            <p>
+                For each pair of residues in the protein backbone, the method calculates:
+            </p>
+            
+            <div class="equation">
+Lk(i,j) = (1/4π) ∫∫ (r₁ × r₂)·(r₁ - r₂) / |r₁ - r₂|³ ds₁ ds₂
+
+Where:
+- r₁, r₂ are position vectors of the two chain segments
+- The integral is computed over the arc length of both segments
+- The result is a continuous measure of linking            </div>
+            
+            <p>
+                Non-zero linking numbers between distant residues indicate the presence of entanglement. The magnitude indicates 
+                the strength of the entanglement.
+            </p>
+            
+            <h3>High-Quality vs. Clustered Results</h3>
+            <p>
+                The analysis produces three levels of results:
+            </p>
+            
+            <table>
+                <tr>
+                    <th>Result Type</th>
+                    <th>Description</th>
+                    <th>Use Case</th>
+                </tr>
+                <tr>
+                    <td><strong>Native_GE</strong></td>
+                    <td>All detected entanglements based on raw Gaussian linking calculation</td>
+                    <td>Comprehensive analysis, research-grade data</td>
+                </tr>
+                <tr>
+                    <td><strong>Native_HQ_GE</strong></td>
+                    <td>High-quality entanglements filtered by statistical significance and structural criteria</td>
+                    <td>Focus on reliable, biologically relevant entanglements</td>
+                </tr>
+                <tr>
+                    <td><strong>Native_Clustered_HQ_GE</strong></td>
+                    <td>Further clustering of HQ results to remove redundancy and group similar entanglements</td>
+                    <td>Simplified interpretation, core entanglement regions</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="doc-section" id="methods">
+            <h2>Methods: EntDetect Analysis Pipeline</h2>
+            
+            <h3>Analysis Steps</h3>
+            
+            <h4>1. Structure Preprocessing</h4>
+            <p>
+                Input structures (PDB or AlphaFold) are first preprocessed to:
+            </p>
+            <ul>
+                <li>Remove heteroatoms and water molecules</li>
+                <li>Identify and handle missing residues</li>
+                <li>Validate chain connectivity</li>
+                <li>Ensure proper residue numbering</li>
+            </ul>
+            
+            <h4>2. Gaussian Entanglement Detection</h4>
+            <p>
+                For all residue pairs (i,j) where i < j-window_size:
+            </p>
+            <ul>
+                <li>Calculate Gaussian linking number between segments</li>
+                <li>Apply thresholding to identify significant entanglements</li>
+                <li>Measure threading direction (N-term or C-term)</li>
+            </ul>
+            
+            <h4>3. High-Quality Filtering</h4>
+            <p>
+                Raw results are filtered based on:
+            </p>
+            <ul>
+                <li><strong>Statistical Significance:</strong> Linking numbers above noise threshold</li>
+                <li><strong>Structural Validity:</strong> Entanglements must respect protein geometry</li>
+                <li><strong>Slipknot Detection:</strong> Remove slipknot artifacts that can be unwound by chain sliding</li>
+                <li><strong>Contact Criteria:</strong> Verify threading through actual structural contacts</li>
+            </ul>
+            
+            <h4>4. Clustering</h4>
+            <p>
+                High-quality entanglements are clustered to group related findings:
+            </p>
+            <ul>
+                <li><strong>Distance-Based Clustering:</strong> Uses organism-specific cutoff distances</li>
+                <li><strong>Degeneracy Removal:</strong> Merges nearly-identical entanglements</li>
+                <li><strong>Organism Profiles:</strong>
+                    <ul style="margin-top: 10px;">
+                        <li><strong>E. coli:</strong> cutoff = 57 Å (prokaryotic optimization)</li>
+                        <li><strong>Human:</strong> cutoff = 52 Å (eukaryotic optimization)</li>
+                        <li><strong>Yeast:</strong> cutoff = 49 Å (smaller eukaryotic optimization)</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <h3>Contact Type Options</h3>
+            <p>The analysis can use different types of inter-atomic contacts:</p>
+            <ul>
+                <li><strong>Heavy Atom Contacts (default):</strong> Uses all non-hydrogen atoms for threading assessment</li>
+                <li><strong>C-alpha Only:</strong> Simplified analysis using backbone atoms, faster computation</li>
+                <li><strong>Coarse-Grained:</strong> Further simplified model for large structures</li>
+            </ul>
+            
+            <h3>Entanglement Detection Methods</h3>
+            <table>
+                <tr>
+                    <th>Method</th>
+                    <th>Description</th>
+                    <th>Sensitivity</th>
+                </tr>
+                <tr>
+                    <td><strong>GLN (Gaussian Linking Number)</strong></td>
+                    <td>Classic Gaussian method</td>
+                    <td>Standard</td>
+                </tr>
+                <tr>
+                    <td><strong>TLN (Topological Linking Number)</strong></td>
+                    <td>Discrete topology-based approach</td>
+                    <td>Conservative</td>
+                </tr>
+                <tr>
+                    <td><strong>Consensus (Default)</strong></td>
+                    <td>Requires agreement between GLN and TLN</td>
+                    <td>High specificity</td>
+                </tr>
+            </table>
+        </div>
+        
+        <div class="doc-section" id="usage">
+            <h2>Usage Guide</h2>
+            
+            <h3>Single Structure Analysis</h3>
+            <ol>
+                <li>Go to the <a href="submit.html">Submit Analysis</a> page</li>
+                <li>Upload your PDB file or enter a PDB ID to download from RCSB</li>
+                <li>Select structure type (Experimental or AlphaFold)</li>
+                <li>Choose organism profile for clustering cutoff</li>
+                <li>Optionally enable feature generation (requires UniProt ID)</li>
+                <li>Click Submit to start analysis</li>
+            </ol>
+            
+            <h3>Batch Analysis</h3>
+            <ol>
+                <li>Go to the <a href="submit.html">Submit Analysis</a> page</li>
+                <li>Click the "Multiple Files" tab</li>
+                <li>Select multiple PDB files at once</li>
+                <li>Optionally set per-file UniProt accession IDs</li>
+                <li>Configure shared analysis parameters</li>
+                <li>Submit to process all files with batch tracking</li>
+            </ol>
+            
+            <h3>Interpreting Results</h3>
+            <p>Results include three main tables:</p>
+            <ul>
+                <li><strong>Native_GE:</strong> All detected entanglements</li>
+                <li><strong>Native_HQ_GE:</strong> Filtered, high-confidence entanglements</li>
+                <li><strong>Native_Clustered_HQ_GE:</strong> Final clustered results (recommended for interpretation)</li>
+            </ul>
+            
+            <p>Key columns in results:</p>
+            <ul>
+                <li><strong>i, j:</strong> Residue indices defining the entanglement</li>
+                <li><strong>crossingsN, crossingsC:</strong> Number of threads from N-terminus and C-terminus</li>
+                <li><strong>gn, gc:</strong> Gaussian linking metrics</li>
+                <li><strong>ENT:</strong> Boolean indicating confirmed entanglement</li>
+            </ul>
+        </div>
+        
+        <div class="doc-section" id="features">
+            <h2>Entanglement Features</h2>
+            
+            <h3>Feature Generation</h3>
+            <p>
+                When enabled (with valid UniProt ID), the system generates detailed entanglement features including:
+            </p>
+            
+            <div class="highlights">
+                <ul>
+                    <li><strong>Threading Metrics:</strong> N-terminal and C-terminal threading counts and positions</li>
+                    <li><strong>Crossing Counts:</strong> Number of strand crossings in different regions</li>
+                    <li><strong>Geometric Features:</strong> Loop sizes, threading depth, structural context</li>
+                    <li><strong>Sequential Analysis:</strong> Position-specific metrics and threading patterns</li>
+                    <li><strong>Protein Coverage:</strong> What percentage of the protein is involved in entanglement</li>
+                    <li><strong>Bond Classification:</strong> Identification of C-C bonds and backbone bonds in threading</li>
+                </ul>
+            </div>
+            
+            <h3>UniProt Integration</h3>
+            <p>
+                Features are enriched with UniProt accession information to enable:
+            </p>
+            <ul>
+                <li>Cross-referencing with UniProt sequence and annotation databases</li>
+                <li>Integration with other structural databases</li>
+                <li>Correlation with biological function</li>
+                <li>Sequence alignment and homology analysis</li>
+            </ul>
+        </div>
+        
+        <div class="doc-section" id="faq">
+            <h2>Frequently Asked Questions</h2>
+            
+            <h3>What file formats are supported?</h3>
+            <p>
+                The platform supports PDB files (.pdb) and can download structures from RCSB PDB using PDB IDs. 
+                AlphaFold predictions should be provided in PDB format.
+            </p>
+            
+            <h3>How long does analysis take?</h3>
+            <p>
+                Analysis time depends on protein size:
+            </p>
+            <ul>
+                <li><strong>Small proteins (&lt;500 residues):</strong> 1-5 minutes</li>
+                <li><strong>Medium proteins (500-2000):</strong> 5-20 minutes</li>
+                <li><strong>Large proteins (&gt;2000):</strong> 20+ minutes</li>
+            </ul>
+            
+            <h3>What does the confidence score mean?</h3>
+            <p>
+                High-quality results (Native_HQ_GE) have been validated against multiple detection methods. 
+                Clustered results (Native_Clustered_HQ_GE) represent the most reliable and consolidated findings.
+            </p>
+            
+            <h3>Can I analyze multi-chain structures?</h3>
+            <p>
+                Yes! Analysis is performed per-chain, so multi-chain structures will show separate results for each chain. 
+                Inter-chain entanglement is analyzed as separate intra-chain problems for each chain.
+            </p>
+            
+            <h3>What does "No entanglements detected" mean?</h3>
+            <p>
+                Some proteins have no knots or complex entanglements. This is a valid biological finding. Many proteins 
+                fold successfully without topological complexity. The absence of entanglement doesn't indicate analysis failure.
+            </p>
+            
+            <h3>How do I cite this work?</h3>
+            <p>
+                Please cite the EntDetect paper and reference this platform. For more information, contact the O'Brien Lab 
+                at Penn State University.
+            </p>
+            
+            <h3>Can I download my results?</h3>
+            <p>
+                Yes! Once your analysis is complete, visit the <a href="browse.html">Browse Results</a> page and use 
+                the Download button to get a ZIP file containing all result files.
+            </p>
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <div id="footer"></div>
+    
+    <script>
+        // Include simple footer
+        document.getElementById('footer').innerHTML = `
+            <footer style="background: #2c3e50; color: #ecf0f1; padding: 30px; text-align: center; margin-top: 40px;">
+                <p>NCLE - Native Gaussian Entanglement Analysis | 
+                <a href="#" style="color: #667eea;" onclick="alert('Contact: ims86@psu.edu'); return false;">Contact</a> | 
+                <a href="#" style="color: #667eea;" onclick="alert('Terms of Service'); return false;">ToS</a>
+                </p>
+                <p style="font-size: 0.9em;">© 2026 Penn State University - O'Brien Lab</p>
+            </footer>
+        `;
+    </script>
+</body>
+</html>

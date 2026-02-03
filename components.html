@@ -1,0 +1,303 @@
+<!-- Reusable Hero Component -->
+<template id="hero-template">
+    <div class="hero-section">
+        <div class="hero-content">
+            <h1>NCLE Web Platform</h1>
+            <p>Native Gaussian Entanglement Analysis & Detection</p>
+        </div>
+    </div>
+</template>
+
+<!-- Reusable Footer Component -->
+<template id="footer-template">
+    <footer class="footer-section">
+        <div class="footer-content">
+            <div class="footer-section-group">
+                <div class="footer-column">
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="index.html">Home</a></li>
+                        <li><a href="submit.html">Submit Analysis</a></li>
+                        <li><a href="browse.html">Browse Results</a></li>
+                        <li><a href="documentation.html">Documentation</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="#" onclick="showTermsOfService(); return false;">Terms of Service</a></li>
+                        <li><a href="#" onclick="showPrivacyPolicy(); return false;">Privacy Policy</a></li>
+                        <li><a href="#" onclick="showContactForm(); return false;">Contact Us</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h4>About</h4>
+                    <p>NCLE is developed by the O'Brien Lab for protein entanglement analysis and detection.</p>
+                    <p style="font-size: 0.9em; margin-top: 10px;">© 2026 Penn State University</p>
+                </div>
+            </div>
+        </div>
+    </footer>
+</template>
+
+<!-- Contact Form Modal -->
+<div id="contactModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeContactForm()">&times;</span>
+        <h2>Contact Us</h2>
+        <form id="contactForm" onsubmit="submitContactForm(event)">
+            <div class="form-group">
+                <label for="contactName">Your Name:</label>
+                <input type="text" id="contactName" name="name" required>
+            </div>
+            <div class="form-group">
+                <label for="contactEmail">Your Email:</label>
+                <input type="email" id="contactEmail" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="contactSubject">Subject:</label>
+                <input type="text" id="contactSubject" name="subject" required>
+            </div>
+            <div class="form-group">
+                <label for="contactMessage">Message:</label>
+                <textarea id="contactMessage" name="message" rows="6" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Send Message</button>
+        </form>
+    </div>
+</div>
+
+<script>
+// Initialize hero and footer on all pages
+document.addEventListener('DOMContentLoaded', function() {
+    initializeHeroAndFooter();
+});
+
+function initializeHeroAndFooter() {
+    // Only add hero/footer if not already present
+    if (!document.querySelector('.hero-section')) {
+        const heroTemplate = document.getElementById('hero-template');
+        if (heroTemplate && document.body) {
+            document.body.insertBefore(
+                heroTemplate.content.cloneNode(true),
+                document.body.firstChild
+            );
+        }
+    }
+    
+    if (!document.querySelector('.footer-section')) {
+        const footerTemplate = document.getElementById('footer-template');
+        if (footerTemplate && document.body) {
+            document.body.appendChild(footerTemplate.content.cloneNode(true));
+        }
+    }
+}
+
+function showContactForm() {
+    document.getElementById('contactModal').style.display = 'block';
+}
+
+function closeContactForm() {
+    document.getElementById('contactModal').style.display = 'none';
+}
+
+function showTermsOfService() {
+    alert('Terms of Service:\n\n1. Use this platform for legitimate research only.\n2. Do not submit malicious or spam content.\n3. Results are provided as-is without warranty.\n4. By using this service, you agree to these terms.');
+}
+
+function showPrivacyPolicy() {
+    alert('Privacy Policy:\n\n1. We collect email addresses for job notifications only.\n2. Emails are not shared with third parties.\n3. Analysis results are stored for 30 days.\n4. You can request deletion of your data at any time.');
+}
+
+async function submitContactForm(event) {
+    event.preventDefault();
+    
+    const formData = {
+        name: document.getElementById('contactName').value,
+        email: document.getElementById('contactEmail').value,
+        subject: document.getElementById('contactSubject').value,
+        message: document.getElementById('contactMessage').value
+    };
+    
+    try {
+        const response = await fetch('/api/contact', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        if (response.ok) {
+            alert('Message sent successfully! We will contact you soon.');
+            document.getElementById('contactForm').reset();
+            closeContactForm();
+        } else {
+            alert('Failed to send message. Please try again later.');
+        }
+    } catch (error) {
+        console.error('Error sending contact form:', error);
+        alert('Error sending message: ' + error.message);
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('contactModal');
+    if (event.target == modal) {
+        modal.style.display = 'none';
+    }
+}
+</script>
+
+<style>
+.hero-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 60px 20px;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.hero-content h1 {
+    margin: 0;
+    font-size: 2.5em;
+    font-weight: bold;
+}
+
+.hero-content p {
+    margin: 10px 0 0 0;
+    font-size: 1.2em;
+    opacity: 0.9;
+}
+
+.footer-section {
+    background: #2c3e50;
+    color: #ecf0f1;
+    padding: 40px 20px;
+    margin-top: 60px;
+    border-top: 1px solid #667eea;
+}
+
+.footer-content {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.footer-section-group {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    margin-bottom: 20px;
+}
+
+.footer-column h4 {
+    color: #667eea;
+    margin-top: 0;
+}
+
+.footer-column ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.footer-column ul li {
+    margin: 8px 0;
+}
+
+.footer-column a {
+    color: #ecf0f1;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.footer-column a:hover {
+    color: #667eea;
+}
+
+.footer-column p {
+    margin: 0;
+    line-height: 1.6;
+    font-size: 0.95em;
+}
+
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.close-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close-btn:hover {
+    color: black;
+}
+
+.modal .form-group {
+    margin-bottom: 15px;
+}
+
+.modal .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.modal .form-group input,
+.modal .form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1em;
+    box-sizing: border-box;
+}
+
+.modal .form-group textarea {
+    resize: vertical;
+}
+
+.modal .btn {
+    width: 100%;
+    padding: 12px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+}
+
+.modal .btn:hover {
+    background: #5568d3;
+}
+</style>

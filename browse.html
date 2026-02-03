@@ -215,13 +215,16 @@
                         {
                             title: "Actions", 
                             field: "job_id",
-                            width: 120,
+                            width: 180,
                             hozAlign: "center",
                             formatter: (cell) => {
                                 const jobId = cell.getValue();
                                 const status = cell.getRow().getData().status;
                                 if (status === 'completed') {
-                                    return `<button class="btn btn-primary btn-sm" onclick="viewResults('${jobId}')">View</button>`;
+                                    return `
+                                        <button class="btn btn-primary btn-sm" onclick="viewResults('${jobId}')" style="margin-right: 5px;">View</button>
+                                        <button class="btn btn-secondary btn-sm" onclick="downloadResults('${jobId}')">Download</button>
+                                    `;
                                 } else {
                                     return '-';
                                 }
@@ -314,6 +317,16 @@
         
         function viewResults(jobId) {
             window.location.href = `results.html?job_id=${jobId}`;
+        }
+        
+        function downloadResults(jobId) {
+            // Create a download link for the results ZIP file
+            const link = document.createElement('a');
+            link.href = `${API_BASE_URL}/api/jobs/${jobId}/download-results`;
+            link.download = `ncle_results_${jobId}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
         
         // Initialize on page load

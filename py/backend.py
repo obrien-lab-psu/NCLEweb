@@ -1172,6 +1172,50 @@ async def get_queue_status():
         raise HTTPException(status_code=500, detail=f"Error fetching queue status: {str(e)}")
 
 
+@app.post("/api/contact")
+async def send_contact_message(
+    name: str = Form(...),
+    email: str = Form(...),
+    subject: str = Form(...),
+    message: str = Form(...)
+):
+    """
+    Handle contact form submissions
+    Sends email to administrator
+    """
+    try:
+        # Validate inputs
+        if not name or not email or not subject or not message:
+            raise HTTPException(status_code=400, detail="All fields are required")
+        
+        # Send email to admin
+        admin_email = os.getenv('ADMIN_EMAIL', 'ims86@psu.edu')
+        email_notifier.send_email(
+            to_email=admin_email,
+            subject=f"[NCLE Contact] {subject}",
+            body=f"""
+New contact message from NCLE Web Platform:
+
+From: {name} ({email})
+Subject: {subject}
+
+Message:
+{message}
+
+---
+Reply to: {email}
+            """
+        )
+        
+        return JSONResponse(content={
+            'success': True,
+            'message': 'Your message has been sent successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error sending contact message: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error sending message: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     

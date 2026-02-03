@@ -219,7 +219,16 @@ def create_batch_jobs(
         
         structure_type = file_opts.get('structure_type', base_params.get('structure_type', 'EXP'))
         organism = file_opts.get('organism', base_params.get('organism', 'Ecoli'))
+        
+        # Get detection_method from per-file options or fall back to base params
+        # Note: frontend sends detection_method as a string, so convert to int
         ent_detection_method = file_opts.get('detection_method', file_opts.get('ent_detection_method', base_params.get('ent_detection_method', 3)))
+        if isinstance(ent_detection_method, str):
+            try:
+                ent_detection_method = int(ent_detection_method)
+            except (ValueError, TypeError):
+                ent_detection_method = 3  # Default to method 3
+        
         cluster_cutoff = file_opts.get('cluster_cutoff', base_params.get('cluster_cutoff'))
         
         # Extract per-file generate_features flag

@@ -8,6 +8,38 @@
     <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
     <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
     <style>
+        /* Header Navigation */
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #2c5f8d 0%, #3a7bb5 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .nav-header h1 {
+            color: white;
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+        
         .browse-container {
             max-width: 1400px;
             margin: 40px auto;
@@ -124,6 +156,16 @@
     </style>
 </head>
 <body>
+    <!-- Navigation Header -->
+    <div class="nav-header">
+        <h1>📊 Browse Results</h1>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="submit.html">Submit</a>
+            <a href="documentation.html">Docs</a>
+        </div>
+    </div>
+    
     <div class="browse-container">
         <div class="browse-header">
             <h1>Browse Analysis Results</h1>
@@ -338,6 +380,121 @@
                 initTable();
             }
         }, 30000);
+    </script>
+    
+    <!-- Footer -->
+    <footer style="background: #2c3e50; color: #ecf0f1; padding: 30px; margin-top: 60px; border-top: 1px solid #34495e;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 30px;">
+                <div>
+                    <h4 style="color: #3498db;">Navigation</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="index.html" style="color: #ecf0f1; text-decoration: none;">Home</a></li>
+                        <li><a href="submit.html" style="color: #ecf0f1; text-decoration: none;">Submit Analysis</a></li>
+                        <li><a href="browse.html" style="color: #ecf0f1; text-decoration: none;">Browse Results</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #3498db;">Resources</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="documentation.html" style="color: #ecf0f1; text-decoration: none;">Documentation</a></li>
+                        <li><a href="#" onclick="showContactForm(); return false;" style="color: #ecf0f1; text-decoration: none;">Contact Us</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #3498db;">Legal</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="#" onclick="showTerms(); return false;" style="color: #ecf0f1; text-decoration: none;">Terms of Service</a></li>
+                        <li><a href="#" onclick="showPrivacy(); return false;" style="color: #ecf0f1; text-decoration: none;">Privacy Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #34495e; padding-top: 20px; text-align: center;">
+                <p style="margin: 10px 0; font-size: 0.9em;">© 2026 Penn State University - O'Brien Lab</p>
+                <p style="margin: 5px 0; font-size: 0.85em; opacity: 0.8;">NCLE - Native Gaussian Entanglement Analysis Platform</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Contact Form Modal -->
+    <div id="contactModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4);">
+        <div style="background-color: white; margin: 10% auto; padding: 30px; border-radius: 8px; width: 80%; max-width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <span style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="closeContactForm()">&times;</span>
+            <h2 style="color: #333; margin-top: 0;">Contact Us</h2>
+            <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="contactName" placeholder="Your Name" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="email" id="contactEmail" placeholder="Your Email" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="text" id="contactSubject" placeholder="Subject" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <textarea id="contactMessage" placeholder="Your message..." required rows="5" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                <button type="button" onclick="submitContactForm()" style="background: #667eea; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Send Message</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Functions -->
+    <script>
+        function showContactForm() {
+            document.getElementById('contactModal').style.display = 'block';
+        }
+        
+        function closeContactForm() {
+            document.getElementById('contactModal').style.display = 'none';
+        }
+        
+        function showTerms() {
+            alert('Terms of Service - The NCLE platform is provided for research and educational purposes.');
+        }
+        
+        function showPrivacy() {
+            alert('Privacy Policy - We collect minimal personal information. Your uploaded PDB files are analyzed and results are stored for the specified retention period.');
+        }
+        
+        function submitContactForm() {
+            const name = document.getElementById('contactName').value;
+            const email = document.getElementById('contactEmail').value;
+            const subject = document.getElementById('contactSubject').value;
+            const message = document.getElementById('contactMessage').value;
+            
+            if (!name || !email || !subject || !message) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            fetch('/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'name': name,
+                    'email': email,
+                    'subject': subject,
+                    'message': message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Message sent successfully! Thank you for contacting us.');
+                    closeContactForm();
+                    document.getElementById('contactForm').reset();
+                } else {
+                    alert('Error sending message: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error sending message');
+            });
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const contactModal = document.getElementById('contactModal');
+            if (event.target == contactModal) {
+                contactModal.style.display = 'none';
+            }
+        }
     </script>
 </body>
 </html>

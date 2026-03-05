@@ -309,6 +309,9 @@
         let proteinId = null;
         let organism = null;
         let entanglementsTable = null;
+        let hqResultsTable = null;
+        let clusteredResultsTable = null;
+        let featuresTable = null;
         let nglStage = null;
         let pdbFileContent = null;
         let currentChain = 'all';
@@ -520,7 +523,7 @@
                 { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
             ];
 
-            entanglementsTable = new Tabulator("#entanglementsTable", {
+            entanglementsTable = new Tabulator("#resultsTable", {
                 data: data,
                 columns: columns,
                 layout: "fitData",
@@ -890,6 +893,12 @@
         document.getElementById('clearSelection')?.addEventListener('click', () => {
             if (entanglementsTable) {
                 entanglementsTable.deselectRow();
+            }
+            if (hqResultsTable) {
+                hqResultsTable.deselectRow();
+            }
+            if (clusteredResultsTable) {
+                clusteredResultsTable.deselectRow();
             }
             updateChainDisplay();
         });

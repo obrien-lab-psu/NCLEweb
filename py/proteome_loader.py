@@ -308,7 +308,7 @@ class ProteomeLoader:
         """
         organisms = []
         for org_key, org_config in ORGANISMS.items():
-            org_path = PROTEOME_DATA_BASE / org_config["path"]
+            org_path = PROTEOME_DATA_BASE / org_config["base_path"]
             available = org_path.exists()
             
             protein_count = 0

@@ -123,11 +123,16 @@ class ProteomeLoader:
                     'has_data': False
                 }
             
-            # Count entanglements and collect chains
+            # Count entanglements where ENT=True and collect chains
             chains = set()
+            num_entanglements = 0
             for row in rows:
-                if row and 'chain' in row:
-                    chains.add(row['chain'])
+                if row:
+                    if 'chain' in row:
+                        chains.add(row['chain'])
+                    # Count rows where ENT column is 'True'
+                    if row.get('ENT', '').lower() == 'true':
+                        num_entanglements += 1
             
             # Count HQ entanglements
             num_hq = self._count_hq_entanglements(protein_id, organism, base_path)
@@ -138,11 +143,11 @@ class ProteomeLoader:
             return {
                 'protein_id': protein_id,
                 'organism': organism,
-                'num_entanglements': len(rows),
+                'num_entanglements': num_entanglements,
                 'num_hq_entanglements': num_hq,
                 'num_clustered_entanglements': num_clustered,
                 'chains': sorted(list(chains)),
-                'has_data': True,
+                'has_data': num_entanglements > 0,
                 'structure_path': f"{protein_id}.pdb"
             }
         
@@ -151,7 +156,7 @@ class ProteomeLoader:
             return None
     
     def _count_hq_entanglements(self, protein_id: str, organism: str, base_path: Path) -> int:
-        """Count HQ entanglements for a protein"""
+        """Count HQ entanglements where ENT=True for a protein"""
         hq_dir = base_path / "Native_HQ_GE"
         hq_file = hq_dir / f"{protein_id}.csv"
         
@@ -161,13 +166,13 @@ class ProteomeLoader:
         try:
             with open(hq_file, 'r') as f:
                 reader = csv.DictReader(f, delimiter='|')
-                rows = [row for row in reader if row]
-            return len(rows)
+                count = sum(1 for row in reader if row and row.get('ENT', '').lower() == 'true')
+            return count
         except:
             return 0
     
     def _count_clustered_entanglements(self, protein_id: str, organism: str, base_path: Path) -> int:
-        """Count Clustered entanglements for a protein"""
+        """Count Clustered entanglements - all rows in the clustered file (no ENT column)"""
         clustered_dir = base_path / "Native_clustered_HQ_GE"
         clustered_file = clustered_dir / f"{protein_id}.csv"
         
@@ -177,8 +182,8 @@ class ProteomeLoader:
         try:
             with open(clustered_file, 'r') as f:
                 reader = csv.DictReader(f, delimiter='|')
-                rows = [row for row in reader if row]
-            return len(rows)
+                count = sum(1 for row in reader if row)
+            return count
         except:
             return 0
     

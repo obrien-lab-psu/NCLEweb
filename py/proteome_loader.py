@@ -313,7 +313,10 @@ class ProteomeLoader:
             
             protein_count = 0
             if available:
-                protein_count = len(list(org_path.glob("*.csv")))
+                # Count CSV files in Native_GE subdirectory
+                native_ge_path = org_path / "Native_GE"
+                if native_ge_path.exists():
+                    protein_count = len(list(native_ge_path.glob("*.csv")))
             
             organisms.append({
                 'organism': org_key,

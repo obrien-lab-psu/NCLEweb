@@ -1254,7 +1254,7 @@ async def get_proteome_proteins(
 @app.get("/api/proteome/{organism}/{protein_id}")
 async def get_protein_entanglements(organism: str, protein_id: str):
     """
-    Get detailed entanglement data for a specific protein
+    Get detailed entanglement data for a specific protein from all sources
     
     Parameters
     ----------
@@ -1266,21 +1266,35 @@ async def get_protein_entanglements(organism: str, protein_id: str):
     Returns
     -------
     JSONResponse
-        Protein info and list of entanglements
+        Protein info and entanglement data from all sources (Native_GE, HQ, Clustered, Features)
     """
     try:
-        entanglements = proteome_loader.get_protein_entanglements(protein_id, organism)
+        # Get all data types
+        native_ge = proteome_loader.get_protein_entanglements(protein_id, organism)
+        native_hq = proteome_loader.get_hq_entanglements(protein_id, organism)
+        native_clustered = proteome_loader.get_clustered_entanglements(protein_id, organism)
+        features = proteome_loader.get_entanglement_features(protein_id, organism)
         
         # Convert to dicts if they're DictReader objects
-        if entanglements and hasattr(entanglements[0], '__getitem__'):
-            entanglements = [dict(e) for e in entanglements]
+        if native_ge and hasattr(native_ge[0], '__getitem__'):
+            native_ge = [dict(e) for e in native_ge]
+        if native_hq and hasattr(native_hq[0], '__getitem__'):
+            native_hq = [dict(e) for e in native_hq]
+        if native_clustered and hasattr(native_clustered[0], '__getitem__'):
+            native_clustered = [dict(e) for e in native_clustered]
+        if features and hasattr(features[0], '__getitem__'):
+            features = [dict(e) for e in features]
         
         return JSONResponse(content={
             'success': True,
             'protein_id': protein_id,
             'organism': organism,
-            'num_entanglements': len(entanglements),
-            'entanglements': entanglements
+            'num_entanglements': len(native_ge),
+            'entanglements': native_ge,
+            'native_ge': native_ge,
+            'native_hq': native_hq,
+            'native_clustered': native_clustered,
+            'features': features
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching protein data: {str(e)}")

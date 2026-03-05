@@ -188,25 +188,10 @@ class ProteomeLoader:
             return 0
     
     def get_protein_entanglements(self, protein_id: str, organism: str) -> List[Dict]:
-        """
-        Get detailed entanglement data for a specific protein
-        
-        Parameters
-        ----------
-        protein_id : str
-            UniProt ID
-        organism : str
-            Organism name
-            
-        Returns
-        -------
-        List[Dict]
-            List of entanglement records
-        """
+        """Get Native_GE entanglement data for a protein"""
         if organism not in ORGANISMS:
             raise ValueError(f"Unknown organism: {organism}")
         
-        # Look for the CSV file in Native_GE with "_GE" suffix
         csv_path = PROTEOME_DATA_BASE / ORGANISMS[organism]["base_path"] / "Native_GE" / f"{protein_id}_GE.csv"
         
         if not csv_path.exists():
@@ -222,6 +207,70 @@ class ProteomeLoader:
         except Exception as e:
             print(f"Error reading {csv_path}: {e}")
             return []
+    
+    def get_hq_entanglements(self, protein_id: str, organism: str) -> List[Dict]:
+        """Get Native_HQ_GE entanglement data for a protein"""
+        if organism not in ORGANISMS:
+            raise ValueError(f"Unknown organism: {organism}")
+        
+        csv_path = PROTEOME_DATA_BASE / ORGANISMS[organism]["base_path"] / "Native_HQ_GE" / f"{protein_id}.csv"
+        
+        if not csv_path.exists():
+            return []
+        
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.DictReader(f, delimiter='|')
+                rows = list(reader)
+            
+            return [row for row in rows if row and 'ID' in row]
+        except Exception as e:
+            print(f"Error reading {csv_path}: {e}")
+            return []
+    
+    def get_clustered_entanglements(self, protein_id: str, organism: str) -> List[Dict]:
+        """Get Native_clustered_HQ_GE entanglement data for a protein"""
+        if organism not in ORGANISMS:
+            raise ValueError(f"Unknown organism: {organism}")
+        
+        csv_path = PROTEOME_DATA_BASE / ORGANISMS[organism]["base_path"] / "Native_clustered_HQ_GE" / f"{protein_id}.csv"
+        
+        if not csv_path.exists():
+            return []
+        
+        try:
+            with open(csv_path, 'r') as f:
+                reader = csv.DictReader(f, delimiter='|')
+                rows = list(reader)
+            
+            return [row for row in rows if row and 'ID' in row]
+        except Exception as e:
+            print(f"Error reading {csv_path}: {e}")
+            return []
+    
+    def get_entanglement_features(self, protein_id: str, organism: str) -> List[Dict]:
+        """Get Entanglement Features data for a protein"""
+        if organism not in ORGANISMS:
+            raise ValueError(f"Unknown organism: {organism}")
+        
+        # Features are stored with pattern: {protein_id}_*_uent_features.csv
+        features_dir = PROTEOME_DATA_BASE / ORGANISMS[organism]["base_path"] / "Native_clustered_HQ_GE_features"
+        
+        if not features_dir.exists():
+            return []
+        
+        features = []
+        try:
+            # Find all feature files for this protein
+            for csv_file in features_dir.glob(f"{protein_id}_*_uent_features.csv"):
+                with open(csv_file, 'r') as f:
+                    reader = csv.DictReader(f, delimiter='|')
+                    rows = list(reader)
+                    features.extend([row for row in rows if row and 'ID' in row])
+        except Exception as e:
+            print(f"Error reading features for {protein_id}: {e}")
+        
+        return features
     
     def get_structure_path(self, protein_id: str) -> Optional[str]:
         """

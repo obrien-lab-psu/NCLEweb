@@ -226,15 +226,74 @@
                         </div>
                     </div>
                     
-                    <!-- Entanglement Results Table -->
-                    <div class="table-section" id="entanglementsSection">
-                        <h3>Entanglement Data</h3>
-                        <div id="entanglementsTable" class="table-container">
+                    <!-- Table Toggle Controls -->
+                    <div class="table-toggle-section" style="background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);">
+                        <h3 style="margin: 0 0 12px 0; font-size: 1.1rem;">Show/Hide Results Tables</h3>
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="toggleNativeGE" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Native_GE Results (ENT=True only)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="toggleHQResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Native_HQ_GE Results</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="toggleClusteredResults" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Native_clustered_HQ_GE (Clustered)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;" id="featuresToggleLabel">
+                                <input type="checkbox" id="toggleFeatures" checked style="margin-right: 8px; width: 18px; height: 18px; cursor: pointer;">
+                                <span style="font-weight: 500;">Entanglement Features</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Native_GE Results Table -->
+                    <div class="table-section" id="nativeGESection">
+                        <h3>Native_GE Results (ENT=True only)</h3>
+                        <div id="resultsTable" class="table-container">
                             <!-- Tabulator table will be rendered here -->
                         </div>
                         
-                        <div id="noEntanglements" class="no-results" style="display: none;">
+                        <div id="noResults" class="no-results" style="display: none;">
                             <p>No entanglements detected in this structure.</p>
+                        </div>
+                    </div>
+
+                    <!-- High-Quality Results Table -->
+                    <div class="table-section" id="hqResultsSection" style="display: none;">
+                        <h3>Native_HQ_GE Results</h3>
+                        <div id="hqResultsTable" class="table-container">
+                            <!-- Tabulator table for HQ results will be rendered here -->
+                        </div>
+                        
+                        <div id="noHQResults" class="no-results" style="display: none;">
+                            <p>No high-quality entanglements remaining after filtering.</p>
+                        </div>
+                    </div>
+
+                    <!-- Clustered Results Table -->
+                    <div class="table-section" id="clusteredResultsSection" style="display: none;">
+                        <h3>Native_clustered_HQ_GE (Clustered Entanglements)</h3>
+                        <div id="clusteredResultsTable" class="table-container">
+                            <!-- Tabulator table for clustered results will be rendered here -->
+                        </div>
+                        
+                        <div id="noClusteredResults" class="no-results" style="display: none;">
+                            <p>No clustered entanglements found.</p>
+                        </div>
+                    </div>
+
+                    <!-- Entanglement Features Table -->
+                    <div class="table-section" id="featuresSection" style="display: none;">
+                        <h3>Entanglement Features</h3>
+                        <div id="featuresTable" class="table-container">
+                            <!-- Tabulator table for features will be rendered here -->
+                        </div>
+                        
+                        <div id="noFeatures" class="no-results" style="display: none;">
+                            <p>No entanglement features available for this protein.</p>
                         </div>
                     </div>
                 </div>
@@ -327,30 +386,107 @@
             document.getElementById('resultsTitle').textContent = 
                 `Entanglement Results - ${proteinId}`;
             
-            // Display stats
-            const entanglements = data.entanglements || [];
-            const numEntanglements = entanglements.length;
+            // Get data from all sources
+            const nativeGE = data.native_ge || data.entanglements || [];
+            const nativeHQ = data.native_hq || [];
+            const nativeClustered = data.native_clustered || [];
+            const features = data.features || [];
+            
+            // Calculate total entanglements (only from native_ge)
+            const totalEntanglements = nativeGE.length;
             
             const statsHTML = `
                 <div class="stat-card">
-                    <div class="stat-value">${numEntanglements}</div>
-                    <div class="stat-label">Total Entanglements</div>
+                    <div class="stat-value">${totalEntanglements}</div>
+                    <div class="stat-label">Total NCLEs (Native_GE)</div>
                 </div>
             `;
             document.getElementById('resultsStats').innerHTML = statsHTML;
             
-            // Show/hide results based on data
-            if (numEntanglements === 0) {
-                document.getElementById('noEntanglements').style.display = 'block';
-                document.getElementById('entanglementsTable').style.display = 'none';
+            // Setup table toggling
+            setupTableToggles();
+            
+            // Render Native_GE Results Table
+            if (nativeGE.length === 0) {
+                document.getElementById('noResults').style.display = 'block';
+                document.getElementById('resultsTable').style.display = 'none';
             } else {
-                document.getElementById('noEntanglements').style.display = 'none';
-                document.getElementById('entanglementsTable').style.display = 'block';
-                renderEntanglementsTable(entanglements);
+                document.getElementById('noResults').style.display = 'none';
+                document.getElementById('resultsTable').style.display = 'block';
+                renderEntanglementsTable(nativeGE);
+            }
+            
+            // Render HQ Results Table
+            if (nativeHQ.length === 0) {
+                document.getElementById('noHQResults').style.display = 'block';
+                document.getElementById('hqResultsTable').style.display = 'none';
+            } else {
+                document.getElementById('noHQResults').style.display = 'none';
+                document.getElementById('hqResultsTable').style.display = 'block';
+                renderHQResultsTable(nativeHQ);
+            }
+            
+            // Render Clustered Results Table
+            if (nativeClustered.length === 0) {
+                document.getElementById('noClusteredResults').style.display = 'block';
+                document.getElementById('clusteredResultsTable').style.display = 'none';
+            } else {
+                document.getElementById('noClusteredResults').style.display = 'none';
+                document.getElementById('clusteredResultsTable').style.display = 'block';
+                renderClusteredResultsTable(nativeClustered);
+            }
+            
+            // Render Features Table
+            if (features.length === 0) {
+                document.getElementById('noFeatures').style.display = 'block';
+                document.getElementById('featuresTable').style.display = 'none';
+                document.getElementById('featuresToggleLabel').style.display = 'none';
+            } else {
+                document.getElementById('noFeatures').style.display = 'none';
+                document.getElementById('featuresTable').style.display = 'block';
+                document.getElementById('featuresToggleLabel').style.display = 'flex';
+                renderFeaturesTable(features);
             }
             
             // Load structure into NGL viewer
             loadStructureIntoNGL(data);
+        }
+
+        // Setup table toggle functionality
+        function setupTableToggles() {
+            const toggleNativeGE = document.getElementById('toggleNativeGE');
+            const toggleHQResults = document.getElementById('toggleHQResults');
+            const toggleClusteredResults = document.getElementById('toggleClusteredResults');
+            const toggleFeatures = document.getElementById('toggleFeatures');
+            
+            const nativeGESection = document.getElementById('nativeGESection');
+            const hqResultsSection = document.getElementById('hqResultsSection');
+            const clusteredResultsSection = document.getElementById('clusteredResultsSection');
+            const featuresSection = document.getElementById('featuresSection');
+            
+            if (toggleNativeGE) {
+                toggleNativeGE.addEventListener('change', function() {
+                    nativeGESection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+            
+            if (toggleHQResults) {
+                toggleHQResults.addEventListener('change', function() {
+                    hqResultsSection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+            
+            if (toggleClusteredResults) {
+                toggleClusteredResults.addEventListener('change', function() {
+                    clusteredResultsSection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+            
+            if (toggleFeatures) {
+                toggleFeatures.addEventListener('change', function() {
+                    featuresSection.style.display = this.checked ? 'block' : 'none';
+                });
+            }
         }
 
         // Show error
@@ -412,6 +548,140 @@
                 }
                 
                 highlightEntanglement(rowData);
+            });
+        }
+
+        // Render Tabulator table for HQ Results
+        function renderHQResultsTable(data) {
+            const columns = [
+                { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+                { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+                { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+                { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+                { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+                { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
+                { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+            ];
+
+            hqResultsTable = new Tabulator("#hqResultsTable", {
+                data: data,
+                columns: columns,
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
+                movableColumns: true,
+                resizableColumns: true,
+                resizableRows: true,
+                height: "600px",
+                tooltips: true,
+                selectable: 1,
+                selectableRollingSelection: false
+            });
+
+            // Handle row selection
+            hqResultsTable.on("rowClick", function(e, row) {
+                const rowData = row.getData();
+                
+                // Update chain selector to match the selected row's chain
+                const chainSelect = document.getElementById('chainSelect');
+                if (chainSelect && currentChain === 'all') {
+                    chainSelect.value = rowData.chain;
+                    currentChain = rowData.chain;
+                }
+                
+                highlightEntanglement(rowData);
+            });
+        }
+
+        // Render Tabulator table for Clustered Results
+        function renderClusteredResultsTable(data) {
+            const columns = [
+                { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+                { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+                { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+                { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+                { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+                { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
+                { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+            ];
+
+            clusteredResultsTable = new Tabulator("#clusteredResultsTable", {
+                data: data,
+                columns: columns,
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
+                movableColumns: true,
+                resizableColumns: true,
+                resizableRows: true,
+                height: "600px",
+                tooltips: true,
+                selectable: 1,
+                selectableRollingSelection: false
+            });
+
+            // Handle row selection
+            clusteredResultsTable.on("rowClick", function(e, row) {
+                const rowData = row.getData();
+                
+                // Update chain selector to match the selected row's chain
+                const chainSelect = document.getElementById('chainSelect');
+                if (chainSelect && currentChain === 'all') {
+                    chainSelect.value = rowData.chain;
+                    currentChain = rowData.chain;
+                }
+                
+                highlightEntanglement(rowData);
+            });
+        }
+
+        // Render Tabulator table for Features
+        function renderFeaturesTable(data) {
+            // Dynamically get column names from data
+            const columns = [];
+            if (data.length > 0) {
+                // Get all unique keys from the data
+                const allKeys = new Set();
+                data.forEach(row => {
+                    Object.keys(row).forEach(key => allKeys.add(key));
+                });
+                
+                // Create columns for each key
+                Array.from(allKeys).sort().forEach(key => {
+                    columns.push({
+                        title: key.charAt(0).toUpperCase() + key.slice(1),
+                        field: key,
+                        minWidth: 100,
+                        widthGrow: 1,
+                        tooltip: true
+                    });
+                });
+            }
+
+            featuresTable = new Tabulator("#featuresTable", {
+                data: data,
+                columns: columns.length > 0 ? columns : [{ title: "No data", field: "error" }],
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
+                movableColumns: true,
+                resizableColumns: true,
+                resizableRows: true,
+                height: "600px",
+                tooltips: true
             });
         }
 

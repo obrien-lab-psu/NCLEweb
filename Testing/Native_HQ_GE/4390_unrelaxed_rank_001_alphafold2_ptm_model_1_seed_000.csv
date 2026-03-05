@@ -1,0 +1,15 @@
+ID|chain|i|j|crossingsN|crossingsC|gn|gc|GLNn|GLNc|TLNn|TLNc|CCbond|ENT|Quality|Reason
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|7|34||+50|0.0|0.32978|0|0|0|1|False|True|Low|NC pLDDT < 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|8|34||+50|0.0|0.34774|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|8|40||+50|0.0|0.69856|0|1|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|9|34||+50|0.0|0.34627|0|0|0|1|True|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|9|35||+50|0.0|0.56418|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|10|36||+50|0.0|0.556|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|10|38||+50|0.0|0.71468|0|1|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|10|40||+50|0.0|0.66078|0|1|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|11|35||+50|0.0|0.5345|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|11|36||+50|0.0|0.52867|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|12|36||+50|0.03385|0.50387|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|13|36||+50|0.0719|0.46967|0|0|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|13|38||+50|0.0608|0.61396|0|1|0|1|False|True|High|NC and Crossings pLDDT >= 70
+4390_unrelaxed_rank_001_alphafold2_ptm_model_1_seed_000|A|44|68|+23||0.71815|0.0|1|0|1|0|False|True|High|NC and Crossings pLDDT >= 70

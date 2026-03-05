@@ -159,8 +159,12 @@ class HQResult(Base):
     gc = Column(Float, nullable=False)
     GLNn = Column(Integer, nullable=False)
     GLNc = Column(Integer, nullable=False)
+    TLNn = Column(Integer)  # Topological linking number N-terminal
+    TLNc = Column(Integer)  # Topological linking number C-terminal
     CCbond = Column(Boolean, nullable=False)
     ENT = Column(Boolean, nullable=False)
+    Quality = Column(String)  # Quality classification (High/Low)
+    Reason = Column(String)  # Reason for quality classification
     
     def __repr__(self):
         return f"<HQResult(job_id='{self.job_id}', chain='{self.chain}', i={self.i}, j={self.j})>"
@@ -177,10 +181,14 @@ class HQResult(Base):
             'c': self.c,
             'gn': self.gn,
             'gc': self.gc,
-            'Gn': self.GLNn,
-            'Gc': self.GLNc,
+            'GLNn': self.GLNn,
+            'GLNc': self.GLNc,
+            'TLNn': self.TLNn,
+            'TLNc': self.TLNc,
             'CCbond': self.CCbond,
-            'ENT': self.ENT
+            'ENT': self.ENT,
+            'Quality': self.Quality,
+            'Reason': self.Reason
         }
 
 
@@ -487,8 +495,12 @@ class Database:
                         gc=float(row['gc']),
                         GLNn=int(row['GLNn']),
                         GLNc=int(row['GLNc']),
+                        TLNn=int(row.get('TLNn', 0)),
+                        TLNc=int(row.get('TLNc', 0)),
                         CCbond=bool(row['CCbond']),
-                        ENT=bool(row['ENT'])
+                        ENT=bool(row['ENT']),
+                        Quality=str(row.get('Quality', '')) if pd.notna(row.get('Quality')) else None,
+                        Reason=str(row.get('Reason', '')) if pd.notna(row.get('Reason')) else None
                     )
                     session.add(hq_result)
             

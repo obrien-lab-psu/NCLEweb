@@ -46,6 +46,7 @@ from database import db, Job, Result, HQResult, ClusteredResult
 from email_notifier import email_notifier
 from job_queue import get_queue_manager
 from batch_submission import create_batch_jobs, get_batch_download_zip
+from proteome_loader import proteome_loader
 
 
 def split_combined_crossings(hq_results: list) -> list:
@@ -597,12 +598,6 @@ async def submit_job(
     if generate_features and not uniprot_id:
         raise HTTPException(status_code=400, detail="UniProt Accession ID is required when generating entanglement features")
     
-    # Auto-enable C-alpha contacts for AlphaFold models (same as run_nativeNCLE.py)
-    # This reduces memory usage and is the standard approach for AF structures
-    if structure_type.upper() == 'AF' and not ca_contact and not coarse_grained:
-        ca_contact = True
-        print(f"Auto-enabling C-alpha contacts for AlphaFold structure: {job_name}")
-    
     # Handle PDB ID input type
     if input_type == "pdb_id":
         if not rcsb_pdb_id:
@@ -994,10 +989,6 @@ async def submit_batch_multiple(
         if not has_uniprot:
             raise HTTPException(status_code=400, detail="UniProt ID is required when generating features")
     
-    # Auto-enable C-alpha contacts for AlphaFold
-    if structure_type.upper() == 'AF' and not ca_contact and not coarse_grained:
-        ca_contact = True
-    
     # Read all PDB files
     MAX_SIZE = 20 * 1024 * 1024  # 20 MB per file
     pdb_files = {}
@@ -1184,6 +1175,256 @@ async def get_queue_status():
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching queue status: {str(e)}")
+
+
+# ============================================================================
+# PROTEOME-WIDE NCLE BROWSER ENDPOINTS
+# ============================================================================
+
+@app.get("/api/proteome/organisms")
+async def get_proteome_organisms():
+    """
+    Get list of available organisms with statistics
+    
+    Returns
+    -------
+    JSONResponse
+        List of organisms with protein counts and availability
+    """
+    try:
+        organisms = proteome_loader.get_available_organisms()
+        return JSONResponse(content={
+            'success': True,
+            'organisms': organisms
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching organisms: {str(e)}")
+
+
+@app.get("/api/proteome/{organism}")
+async def get_proteome_proteins(
+    organism: str,
+    offset: int = 0,
+    limit: int = 50,
+    search: Optional[str] = None
+):
+    """
+    Get list of proteins for a given organism with optional searching
+    
+    Parameters
+    ----------
+    organism : str
+        Organism name (Yeast, Human, Ecoli)
+    offset : int
+        Pagination offset
+    limit : int
+        Number of results per page
+    search : str, optional
+        Search query for protein ID
+    
+    Returns
+    -------
+    JSONResponse
+        Paginated list of proteins with entanglement counts
+    """
+    try:
+        if search:
+            all_proteins = proteome_loader.search_proteins(search, organism)
+        else:
+            all_proteins = proteome_loader.load_proteome_data(organism)
+        
+        total = len(all_proteins)
+        proteins = all_proteins[offset:offset + limit]
+        
+        return JSONResponse(content={
+            'success': True,
+            'organism': organism,
+            'total': total,
+            'count': len(proteins),
+            'offset': offset,
+            'limit': limit,
+            'proteins': proteins
+        })
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching proteins: {str(e)}")
+
+
+@app.get("/api/proteome/{organism}/{protein_id}")
+async def get_protein_entanglements(organism: str, protein_id: str):
+    """
+    Get detailed entanglement data for a specific protein
+    
+    Parameters
+    ----------
+    organism : str
+        Organism name
+    protein_id : str
+        UniProt ID
+    
+    Returns
+    -------
+    JSONResponse
+        Protein info and list of entanglements
+    """
+    try:
+        entanglements = proteome_loader.get_protein_entanglements(protein_id, organism)
+        
+        # Convert to dicts if they're DictReader objects
+        if entanglements and hasattr(entanglements[0], '__getitem__'):
+            entanglements = [dict(e) for e in entanglements]
+        
+        return JSONResponse(content={
+            'success': True,
+            'protein_id': protein_id,
+            'organism': organism,
+            'num_entanglements': len(entanglements),
+            'entanglements': entanglements
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching protein data: {str(e)}")
+
+
+@app.get("/api/proteome/{organism}/{protein_id}/pdb")
+async def get_protein_pdb(organism: str, protein_id: str):
+    """
+    Get PDB structure file for a protein
+    
+    Parameters
+    ----------
+    organism : str
+        Organism name
+    protein_id : str
+        UniProt ID
+    
+    Returns
+    -------
+    PlainTextResponse
+        PDB file content
+    """
+    try:
+        pdb_path = proteome_loader.get_structure_path(protein_id)
+        
+        if not pdb_path:
+            raise HTTPException(status_code=404, detail=f"PDB file not found for {protein_id}")
+        
+        with open(pdb_path, 'r') as f:
+            pdb_content = f.read()
+        
+        return PlainTextResponse(pdb_content)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching PDB file: {str(e)}")
+
+
+@app.get("/api/proteome/{organism}/{protein_id}/download")
+async def download_protein_data(organism: str, protein_id: str):
+    """
+    Download entanglement data for a single protein
+    
+    Parameters
+    ----------
+    organism : str
+        Organism name
+    protein_id : str
+        UniProt ID
+    
+    Returns
+    -------
+    StreamingResponse
+        Zip file with Native_GE, Native_HQ_GE, Native_clustered_HQ_GE, and features data
+    """
+    try:
+        from pathlib import Path
+        
+        base_path = Path("/home/ianms/NCLE_DB/NCLE_results") / f"{organism}/AlphaFoldv4"
+        
+        # Create zip file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Subdirectories with data types
+            subdirs = [
+                "Native_GE",
+                "Native_HQ_GE", 
+                "Native_clustered_HQ_GE",
+                "Native_clustered_HQ_GE_features"
+            ]
+            
+            for subdir in subdirs:
+                csv_path = base_path / subdir / f"{protein_id}.csv"
+                if csv_path.exists():
+                    with open(csv_path, 'r') as f:
+                        csv_content = f.read()
+                    zip_file.writestr(f"{subdir}/{protein_id}.csv", csv_content)
+        
+        zip_buffer.seek(0)
+        return StreamingResponse(
+            iter([zip_buffer.getvalue()]),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={protein_id}_{organism}.zip"}
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating download: {str(e)}")
+
+
+@app.post("/api/proteome/{organism}/download-filtered")
+async def download_filtered_proteome_data(organism: str, protein_ids: List[str] = None):
+    """
+    Download entanglement data for multiple proteins
+    
+    Parameters
+    ----------
+    organism : str
+        Organism name
+    protein_ids : List[str]
+        List of protein IDs to download
+    
+    Returns
+    -------
+    StreamingResponse
+        Zip file with data for all requested proteins
+    """
+    try:
+        from pathlib import Path
+        
+        if not protein_ids:
+            raise HTTPException(status_code=400, detail="No proteins specified")
+        
+        base_path = Path("/home/ianms/NCLE_DB/NCLE_results") / f"{organism}/AlphaFoldv4"
+        
+        # Create zip file in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # Subdirectories with data types
+            subdirs = [
+                "Native_GE",
+                "Native_HQ_GE",
+                "Native_clustered_HQ_GE",
+                "Native_clustered_HQ_GE_features"
+            ]
+            
+            for subdir in subdirs:
+                for protein_id in protein_ids:
+                    csv_path = base_path / subdir / f"{protein_id}.csv"
+                    if csv_path.exists():
+                        with open(csv_path, 'r') as f:
+                            csv_content = f.read()
+                        zip_file.writestr(f"{subdir}/{protein_id}.csv", csv_content)
+        
+        zip_buffer.seek(0)
+        return StreamingResponse(
+            iter([zip_buffer.getvalue()]),
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename={organism}_proteome_data.zip"}
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error creating download: {str(e)}")
 
 
 @app.post("/api/contact")

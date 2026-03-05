@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Standard Database - NCLE</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
+    <style>
+        /* Header Navigation */
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #2c5f8d 0%, #3a7bb5 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .nav-header h1 {
+            color: white;
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+        
+        .browse-container {
+            max-width: 1400px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        
+        .browse-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .browse-header h1 {
+            color: #f0f0f0;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: background 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.9em;
+        }
+        
+        .stats-bar {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            flex: 1;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 500;
+        }
+        
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-pending {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Header -->
+    <div class="nav-header">
+        <h1>🧬 Gold Standard Database</h1>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="submit.html">Submit</a>
+            <a href="browse.html">Browse Results</a>
+            <a href="documentation.html">Docs</a>
+        </div>
+    </div>
+    
+    <div class="browse-container">
+        <div class="browse-header">
+            <h1>Proteome-wide NCLE Database</h1>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="window.location.href='index.html'">
+                    ← Home
+                </button>
+                <button class="btn btn-primary" onclick="window.location.href='submit.html'">
+                    + New Analysis
+                </button>
+            </div>
+        </div>
+        
+        <div class="stats-bar" id="statsBar">
+            <div class="stat-card">
+                <div class="stat-value" id="totalProteins">-</div>
+                <div class="stat-label">Total Proteins</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="proteinsWithEntanglements">-</div>
+                <div class="stat-label">With Entanglements</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="totalEntanglements">-</div>
+                <div class="stat-label">Total Entanglements</div>
+            </div>
+        </div>
+        
+        <div style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; display: flex; gap: 10px;">
+            <button class="btn btn-secondary" onclick="downloadCurrentTable()">
+                📥 Download Filtered Data
+            </button>
+            <span style="color: #999; align-self: center; font-size: 0.9em;">
+                All displayed proteins will be included in the ZIP file
+            </span>
+        </div>
+        
+        <div class="table-container">
+            <div id="proteinsTable"></div>
+        </div>
+        
+        <div id="loading" class="loading" style="display: none;">
+            Loading proteins...
+        </div>
+    </div>
+    
+    <script>
+        // Use localhost for local file testing, otherwise use the same origin as the page
+        const API_BASE_URL = window.location.protocol === 'file:' 
+            ? 'http://127.0.0.1:8000' 
+            : window.location.origin;
+        let proteinsTable = null;
+        
+        // Format date for display
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+        
+        // Initialize table
+        async function initTable() {
+            try {
+                // Fetch proteins
+                const response = await fetch(`${API_BASE_URL}/api/proteome/Yeast?limit=5000`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error('Failed to load proteins');
+                }
+                
+                // Calculate stats
+                const proteins = data.proteins || [];
+                const withEntanglements = proteins.filter(p => p.num_entanglements > 0).length;
+                let totalEntanglements = 0;
+                proteins.forEach(p => totalEntanglements += p.num_entanglements);
+                
+                document.getElementById('totalProteins').textContent = proteins.length;
+                document.getElementById('proteinsWithEntanglements').textContent = withEntanglements;
+                document.getElementById('totalEntanglements').textContent = totalEntanglements;
+                
+                // Create table
+                proteinsTable = new Tabulator("#proteinsTable", {
+                    data: proteins,
+                    layout: "fitColumns",
+                    pagination: true,
+                    paginationSize: 20,
+                    paginationSizeSelector: [10, 20, 50, 100],
+                    movableColumns: true,
+                    resizableRows: true,
+                    height: "600px",
+                    columns: [
+                        {
+                            title: "Actions", 
+                            field: "protein_id",
+                            width: 100,
+                            hozAlign: "center",
+                            formatter: (cell) => {
+                                const proteinId = cell.getValue();
+                                const organism = cell.getRow().getData().organism;
+                                return `<button class="btn btn-primary btn-sm" onclick="viewResults('${proteinId}', '${organism}')">View</button>`;
+                            }
+                        },
+                        {
+                            title: "UniProt ID", 
+                            field: "protein_id", 
+                            width: 120,
+                            headerFilter: "input"
+                        },
+                        {
+                            title: "Organism", 
+                            field: "organism", 
+                            width: 120,
+                            headerFilter: "select",
+                            headerFilterParams: {
+                                values: {"": "All", "Yeast": "Yeast", "Human": "Human", "E.coli": "E.coli"}
+                            }
+                        },
+                        {
+                            title: "Entanglements", 
+                            field: "num_entanglements", 
+                            width: 130,
+                            hozAlign: "center"
+                        },
+                        {
+                            title: "HQ Entanglements", 
+                            field: "num_hq_entanglements", 
+                            width: 150,
+                            hozAlign: "center"
+                        },
+                        {
+                            title: "Clustered", 
+                            field: "num_clustered_entanglements", 
+                            width: 110,
+                            hozAlign: "center"
+                        },
+                        {
+                            title: "Chains", 
+                            field: "chains", 
+                            width: 100,
+                            hozAlign: "center",
+                            formatter: (cell) => {
+                                const chains = cell.getValue();
+                                return Array.isArray(chains) ? chains.join(', ') : '-';
+                            }
+                        }
+                    ],
+                    initialSort: [
+                        {column: "num_entanglements", dir: "desc"}
+                    ]
+                });
+                
+            } catch (error) {
+                console.error('Error loading proteins:', error);
+                alert('Failed to load proteins: ' + error.message);
+            }
+        }
+        
+        function viewResults(proteinId, organism) {
+            window.location.href = `proteome-results.html?protein_id=${proteinId}&organism=${organism}`;
+        }
+        
+        // Download filtered data
+        async function downloadCurrentTable() {
+            if (!proteinsTable) return;
+            
+            // Get all visible rows (respect current filters/pagination)
+            const visibleRows = proteinsTable.getRows();
+            const proteinIds = visibleRows.map(row => row.getData().protein_id);
+            
+            if (proteinIds.length === 0) {
+                alert('No proteins to download');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/proteome/Yeast/download-filtered`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(proteinIds)
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Yeast_proteome_data_${new Date().toISOString().split('T')[0]}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+            } catch (error) {
+                console.error('Download failed:', error);
+                alert('Failed to download data: ' + error.message);
+            }
+        }
+        
+        // Download individual protein data
+        function downloadProteinData(proteinId, organism) {
+            const url = `${API_BASE_URL}/api/proteome/${organism}/${proteinId}/download`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${proteinId}_${organism}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    </script>
+    
+    <!-- Footer -->
+    <footer style="background: #2c3e50; color: #ecf0f1; padding: 30px; margin-top: 60px; border-top: 1px solid #34495e;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 30px;">
+                <div>
+                    <h4 style="color: #3498db;">Navigation</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="index.html" style="color: #ecf0f1; text-decoration: none;">Home</a></li>
+                        <li><a href="submit.html" style="color: #ecf0f1; text-decoration: none;">Submit Analysis</a></li>
+                        <li><a href="browse.html" style="color: #ecf0f1; text-decoration: none;">Browse Results</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #3498db;">Resources</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="documentation.html" style="color: #ecf0f1; text-decoration: none;">Documentation</a></li>
+                        <li><a href="#" onclick="showContactForm(); return false;" style="color: #ecf0f1; text-decoration: none;">Contact Us</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #3498db;">Legal</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="#" onclick="showTerms(); return false;" style="color: #ecf0f1; text-decoration: none;">Terms of Service</a></li>
+                        <li><a href="#" onclick="showPrivacy(); return false;" style="color: #ecf0f1; text-decoration: none;">Privacy Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #34495e; padding-top: 20px; text-align: center;">
+                <p style="margin: 10px 0; font-size: 0.9em;">© 2026 Penn State University - O'Brien Lab</p>
+                <p style="margin: 5px 0; font-size: 0.85em; opacity: 0.8;">NCLE - Native Gaussian Entanglement Analysis Platform</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Contact Form Modal -->
+    <div id="contactModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4);">
+        <div style="background-color: white; margin: 10% auto; padding: 30px; border-radius: 8px; width: 80%; max-width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <span style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="closeContactForm()">&times;</span>
+            <h2 style="color: #333; margin-top: 0;">Contact Us</h2>
+            <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="contactName" placeholder="Your Name" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="email" id="contactEmail" placeholder="Your Email" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="text" id="contactSubject" placeholder="Subject" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <textarea id="contactMessage" placeholder="Your message..." required rows="5" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                <button type="button" onclick="submitContactForm()" style="background: #667eea; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Send Message</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Functions -->
+    <script>
+        function showContactForm() {
+            document.getElementById('contactModal').style.display = 'block';
+        }
+        
+        function closeContactForm() {
+            document.getElementById('contactModal').style.display = 'none';
+        }
+        
+        function showTerms() {
+            alert('Terms of Service - The NCLE platform is provided for research and educational purposes.');
+        }
+        
+        function showPrivacy() {
+            alert('Privacy Policy - We collect minimal personal information. Your uploaded PDB files are analyzed and results are stored for the specified retention period.');
+        }
+        
+        function submitContactForm() {
+            const name = document.getElementById('contactName').value;
+            const email = document.getElementById('contactEmail').value;
+            const subject = document.getElementById('contactSubject').value;
+            const message = document.getElementById('contactMessage').value;
+            
+            if (!name || !email || !subject || !message) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            fetch('/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'name': name,
+                    'email': email,
+                    'subject': subject,
+                    'message': message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Message sent successfully! Thank you for contacting us.');
+                    closeContactForm();
+                    document.getElementById('contactForm').reset();
+                } else {
+                    alert('Error sending message: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error sending message');
+            });
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const contactModal = document.getElementById('contactModal');
+            if (event.target == contactModal) {
+                contactModal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

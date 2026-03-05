@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gold Standard Results - NCLE</title>
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- NGL Viewer -->
+    <script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+    
+    <!-- Tabulator for interactive tables -->
+    <link href="https://unpkg.com/tabulator-tables@5.5.2/dist/css/tabulator.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/tabulator-tables@5.5.2/dist/js/tabulator.min.js"></script>
+    
+    <style>
+        /* Header Navigation */
+        .nav-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #2c5f8d 0%, #3a7bb5 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .nav-header h1 {
+            color: white;
+            margin: 0;
+            font-size: 1.5em;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-links a:hover {
+            opacity: 0.8;
+        }
+        
+        .job-info-section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .job-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .job-info-item {
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .job-info-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        
+        .job-info-value {
+            font-size: 1rem;
+            color: #333;
+            word-break: break-word;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 24px 0;
+            color: #721c24;
+        }
+        
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+        }
+        
+        .breadcrumb {
+            margin-bottom: 24px;
+            font-size: 0.9rem;
+        }
+        
+        .breadcrumb a {
+            color: #e0e0e0;
+            text-decoration: none;
+        }
+        
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        
+        .breadcrumb span {
+            color: #b0b0b0;
+            margin: 0 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation Header -->
+    <div class="nav-header">
+        <h1>📋 Gold Standard Results</h1>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="proteome.html">Database</a>
+            <a href="browse.html">Submitted Results</a>
+            <a href="documentation.html">Docs</a>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div id="resultsPage" class="page">
+            <header>
+                <h1>Entanglement Results</h1>
+                <div class="breadcrumb">
+                    <a href="index.html">Home</a>
+                    <span>/</span>
+                    <a href="proteome.html">Gold Standard Database</a>
+                    <span>/</span>
+                    <span id="breadcrumbProteinName">Results</span>
+                </div>
+            </header>
+
+            <!-- Loading State -->
+            <div id="loadingState" class="loading-container">
+                <div class="spinner"></div>
+                <p>Loading entanglement data...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" style="display: none;">
+                <div class="error-message">
+                    <h3>Error Loading Results</h3>
+                    <p id="errorMessage"></p>
+                </div>
+                <button onclick="window.location.href='proteome.html'" class="btn btn-primary">
+                    Return to Database
+                </button>
+            </div>
+
+            <!-- Protein Info Section -->
+            <div id="proteinInfoSection" class="job-info-section" style="display: none;">
+                <h2>Protein Information</h2>
+                <div class="job-info-grid">
+                    <div class="job-info-item">
+                        <div class="job-info-label">Protein ID</div>
+                        <div class="job-info-value" id="proteinId">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">Organism</div>
+                        <div class="job-info-value" id="organism">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">Chains</div>
+                        <div class="job-info-value" id="chains">-</div>
+                    </div>
+                    <div class="job-info-item">
+                        <div class="job-info-label">Entanglements Found</div>
+                        <div class="job-info-value" id="numEntanglements">-</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Section -->
+            <div id="resultsSection" class="results-section" style="display: none;">
+                <div class="results-header">
+                    <h2 id="resultsTitle">Entanglement Results</h2>
+                    <div class="results-actions">
+                        <button id="downloadData" class="btn btn-primary">📥 Download Data</button>
+                        <button onclick="window.location.href='proteome.html'" class="btn btn-secondary">
+                            Return to Database
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="resultsStats" class="stats-row">
+                    <!-- Stats will be inserted here -->
+                </div>
+                
+                <div class="results-content">
+                    <!-- Structure Viewer -->
+                    <div class="viewer-section">
+                        <h3>Structure Viewer</h3>
+                        <div id="nglViewport" class="ngl-viewport"></div>
+                        <div class="viewer-controls">
+                            <div class="chain-selector">
+                                <label for="chainSelect">Chain:</label>
+                                <select id="chainSelect" class="chain-select">
+                                    <option value="all">All Chains</option>
+                                </select>
+                            </div>
+                            <button id="resetView" class="btn btn-secondary">Reset View</button>
+                            <button id="clearSelection" class="btn btn-secondary">Clear Selection</button>
+                            <button id="toggleSpin" class="btn btn-secondary">Toggle Spin</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Entanglement Results Table -->
+                    <div class="table-section" id="entanglementsSection">
+                        <h3>Entanglement Data</h3>
+                        <div id="entanglementsTable" class="table-container">
+                            <!-- Tabulator table will be rendered here -->
+                        </div>
+                        
+                        <div id="noEntanglements" class="no-results" style="display: none;">
+                            <p>No entanglements detected in this structure.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use localhost for local file testing, otherwise use the same origin as the page
+        const API_BASE_URL = window.location.protocol === 'file:' 
+            ? 'http://127.0.0.1:8000' 
+            : window.location.origin;
+        let proteinId = null;
+        let organism = null;
+        let entanglementsTable = null;
+        let nglStage = null;
+        let pdbFileContent = null;
+        let currentChain = 'all';
+        let isSpinning = false;
+
+        // Get protein_id and organism from URL parameters
+        function getParamsFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return {
+                protein_id: urlParams.get('protein_id'),
+                organism: urlParams.get('organism')
+            };
+        }
+
+        // Format date string
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        // Load entanglement data from API
+        async function loadProteinData() {
+            const params = getParamsFromURL();
+            proteinId = params.protein_id;
+            organism = params.organism;
+            
+            if (!proteinId || !organism) {
+                showError('Missing protein_id or organism in URL');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/proteome/${organism}/${proteinId}?t=${Date.now()}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load protein data: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                displayProteinData(data);
+                
+            } catch (error) {
+                console.error('Error loading protein:', error);
+                showError(error.message);
+            }
+        }
+
+        // Display protein data
+        function displayProteinData(data) {
+            // Hide loading, show content
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('proteinInfoSection').style.display = 'block';
+            
+            // Update breadcrumb
+            document.getElementById('breadcrumbProteinName').textContent = proteinId;
+            
+            // Fill protein info
+            document.getElementById('proteinId').textContent = proteinId;
+            document.getElementById('organism').textContent = organism;
+            document.getElementById('numEntanglements').textContent = data.num_entanglements || 0;
+            
+            const chainsStr = (data.chains && Array.isArray(data.chains)) ? data.chains.join(', ') : (data.chains || '-');
+            document.getElementById('chains').textContent = chainsStr;
+            
+            // Display results
+            displayResults(data);
+        }
+
+        // Display results
+        function displayResults(data) {
+            document.getElementById('resultsSection').style.display = 'block';
+            
+            // Update title
+            document.getElementById('resultsTitle').textContent = 
+                `Entanglement Results - ${proteinId}`;
+            
+            // Display stats
+            const entanglements = data.entanglements || [];
+            const numEntanglements = entanglements.length;
+            
+            const statsHTML = `
+                <div class="stat-card">
+                    <div class="stat-value">${numEntanglements}</div>
+                    <div class="stat-label">Total Entanglements</div>
+                </div>
+            `;
+            document.getElementById('resultsStats').innerHTML = statsHTML;
+            
+            // Show/hide results based on data
+            if (numEntanglements === 0) {
+                document.getElementById('noEntanglements').style.display = 'block';
+                document.getElementById('entanglementsTable').style.display = 'none';
+            } else {
+                document.getElementById('noEntanglements').style.display = 'none';
+                document.getElementById('entanglementsTable').style.display = 'block';
+                renderEntanglementsTable(entanglements);
+            }
+            
+            // Load structure into NGL viewer
+            loadStructureIntoNGL(data);
+        }
+
+        // Show error
+        function showError(message) {
+            document.getElementById('loadingState').style.display = 'none';
+            document.getElementById('proteinInfoSection').style.display = 'none';
+            document.getElementById('resultsSection').style.display = 'none';
+            document.getElementById('errorState').style.display = 'block';
+            
+            // Strip ANSI escape codes from error message
+            let cleanMessage = message.replace(/\x1b\[[0-9;]*m/g, '');
+            
+            document.getElementById('errorMessage').textContent = cleanMessage;
+        }
+
+        // Render Tabulator table for entanglements
+        function renderEntanglementsTable(data) {
+            const columns = [
+                { title: "Chain", field: "chain", minWidth: 70, widthGrow: 1 },
+                { title: "i", field: "i", minWidth: 70, widthGrow: 1 },
+                { title: "j", field: "j", minWidth: 70, widthGrow: 1 },
+                { title: "Crossings N", field: "crossingsN", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "Crossings C", field: "crossingsC", minWidth: 150, widthGrow: 2, tooltip: true },
+                { title: "gn", field: "gn", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "gc", field: "gc", minWidth: 90, widthGrow: 1, formatter: "money", formatterParams: { precision: 5, symbol: "" } },
+                { title: "GLNn", field: "GLNn", minWidth: 70, widthGrow: 1 },
+                { title: "GLNc", field: "GLNc", minWidth: 70, widthGrow: 1 },
+                { title: "TLNn", field: "TLNn", minWidth: 70, widthGrow: 1 },
+                { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
+                { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
+                { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+            ];
+
+            entanglementsTable = new Tabulator("#entanglementsTable", {
+                data: data,
+                columns: columns,
+                layout: "fitData",
+                pagination: true,
+                paginationSize: 20,
+                paginationSizeSelector: [10, 20, 50, 100],
+                movableColumns: true,
+                resizableColumns: true,
+                resizableRows: true,
+                height: "600px",
+                tooltips: true,
+                selectable: 1,
+                selectableRollingSelection: false
+            });
+
+            // Handle row selection
+            entanglementsTable.on("rowClick", function(e, row) {
+                const rowData = row.getData();
+                
+                // Update chain selector to match the selected row's chain
+                const chainSelect = document.getElementById('chainSelect');
+                if (chainSelect && currentChain === 'all') {
+                    chainSelect.value = rowData.chain;
+                    currentChain = rowData.chain;
+                }
+                
+                highlightEntanglement(rowData);
+            });
+        }
+
+        // Load structure into NGL viewer
+        function loadStructureIntoNGL(proteinData) {
+            const viewport = document.getElementById('nglViewport');
+            viewport.innerHTML = ''; // Clear existing content
+            
+            nglStage = new NGL.Stage(viewport, {
+                backgroundColor: "white"
+            });
+
+            // Fetch PDB file
+            fetch(`${API_BASE_URL}/api/proteome/${organism}/${proteinId}/pdb`)
+                .then(response => response.text())
+                .then(pdbContent => {
+                    pdbFileContent = pdbContent;
+                    
+                    const blob = new Blob([pdbContent], { type: 'text/plain' });
+                    nglStage.loadFile(blob, { ext: "pdb" }).then(function (component) {
+                        // Use cartoon representation for structures
+                        component.addRepresentation("cartoon", {
+                            colorScheme: "chainname"
+                        });
+                        component.autoView();
+                        
+                        // Populate chain selector
+                        populateChainSelector(component.structure);
+                    });
+
+                    window.addEventListener('resize', () => {
+                        if (nglStage) nglStage.handleResize();
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading structure:', error);
+                    document.querySelector('.viewer-section').innerHTML = `
+                        <h3>Structure Viewer</h3>
+                        <div class="no-results">
+                            <p>Could not load structure for this protein.</p>
+                        </div>
+                    `;
+                });
+        }
+
+        // Populate chain selector
+        function populateChainSelector(structure) {
+            const chainSelect = document.getElementById('chainSelect');
+            chainSelect.innerHTML = '<option value="all">All Chains</option>';
+            
+            const chains = [];
+            structure.eachChain(chain => {
+                chains.push(chain.chainname);
+            });
+            
+            const uniqueChains = [...new Set(chains)];
+            
+            uniqueChains.forEach(chain => {
+                const option = document.createElement('option');
+                option.value = chain;
+                option.textContent = `Chain ${chain}`;
+                chainSelect.appendChild(option);
+            });
+            
+            chainSelect.addEventListener('change', (e) => {
+                currentChain = e.target.value;
+                updateChainDisplay();
+            });
+            
+            // Set initial currentChain value
+            currentChain = chainSelect.value;
+        }
+
+        // Update chain display
+        function updateChainDisplay() {
+            if (!nglStage || nglStage.compList.length === 0) return;
+            
+            const component = nglStage.compList[0];
+            component.removeAllRepresentations();
+            
+            if (currentChain === 'all') {
+                component.addRepresentation("cartoon", {
+                    colorScheme: "chainname"
+                });
+            } else {
+                component.addRepresentation("cartoon", {
+                    sele: `:${currentChain}`,
+                    colorScheme: "chainname"
+                });
+            }
+        }
+
+        // Highlight entanglement
+        function highlightEntanglement(rowData) {
+            if (!nglStage || nglStage.compList.length === 0) return;
+            
+            console.log('highlightEntanglement called with:', rowData);
+            
+            const component = nglStage.compList[0];
+            
+            // Remove previous highlights
+            component.removeAllRepresentations();
+            
+            // 1. Base representation - show based on chain selection in grey
+            if (currentChain === 'all') {
+                // Show all chains in grey
+                component.addRepresentation("cartoon", {
+                    color: "grey",
+                    opacity: 0.3
+                });
+            } else {
+                // Show only selected chain in grey
+                component.addRepresentation("cartoon", {
+                    sele: `:${currentChain}`,
+                    color: "grey",
+                    opacity: 0.3
+                });
+            }
+            
+            // Parse crossings - handle null, undefined, empty string, and '?' values
+            const parseCrossings = (crossingStr) => {
+                if (!crossingStr || crossingStr === '' || crossingStr === '?' || crossingStr === 'nan') {
+                    return [];
+                }
+                return crossingStr.split(',').map(s => {
+                    const num = s.trim().replace(/[+\-]/g, '');
+                    return parseInt(num);
+                }).filter(n => !isNaN(n) && n > 0);
+            };
+            
+            const crossingsN = parseCrossings(rowData.crossingsN);
+            const crossingsC = parseCrossings(rowData.crossingsC);
+            const allCrossings = [...crossingsN, ...crossingsC];
+            
+            console.log('Parsed crossings:', {
+                crossingsN_raw: rowData.crossingsN,
+                crossingsC_raw: rowData.crossingsC,
+                crossingsN,
+                crossingsC,
+                allCrossings
+            });
+            
+            // 2. Highlight loop (i to j) in BRIGHT RED
+            const chainSele = `:${rowData.chain}`;
+            component.addRepresentation("cartoon", {
+                sele: `${chainSele} and ${rowData.i}-${rowData.j}`,
+                color: "#FF0000",  // Bright red
+                aspectRatio: 5,
+                scale: 1.8,
+                opacity: 1.0
+            });
+            
+            // 3. Highlight crossing residues +/- 3 in BRIGHT BLUE
+            if (allCrossings.length > 0) {
+                const crossingSelections = [];
+                allCrossings.forEach(res => {
+                    const start = res - 3;
+                    const end = res + 3;
+                    crossingSelections.push(`${start}-${end}`);
+                });
+
+                const crossingSele = `${chainSele} and (${crossingSelections.join(' or ')})`;
+                component.addRepresentation('cartoon', {
+                    sele: crossingSele,
+                    color: '#0000FF',  // Bright blue
+                    aspectRatio: 5,
+                    scale: 1.8,
+                    opacity: 1.0
+                });
+            }
+            
+            // 4. Add VDW (spacefill) for i and j in BRIGHT RED
+            component.addRepresentation("spacefill", {
+                sele: `${chainSele} and (${rowData.i} or ${rowData.j})`,
+                color: "#FF0000",  // Bright red
+                scale: 1.2
+            });
+            
+            // 5. Add VDW (spacefill) for crossing residues in BRIGHT BLUE
+            if (allCrossings.length > 0) {
+                const crossingVdwSele = `${chainSele} and (${allCrossings.join(' or ')})`;
+
+                component.addRepresentation('spacefill', {
+                    sele: crossingVdwSele,
+                    color: '#0000FF',  // Bright blue
+                    scale: 1.2
+                });
+            }
+            
+            // Center view on the entanglement region
+            const minRes = allCrossings.length > 0 ? Math.min(rowData.i, ...allCrossings) : rowData.i;
+            const maxRes = allCrossings.length > 0 ? Math.max(rowData.j, ...allCrossings) : rowData.j;
+
+            const autoViewSele = `${chainSele} and ${minRes}-${maxRes}`;
+            component.autoView(autoViewSele, 500);
+        }
+
+        // Reset view
+        document.getElementById('resetView')?.addEventListener('click', () => {
+            if (nglStage && nglStage.compList.length > 0) {
+                nglStage.compList[0].autoView();
+            }
+        });
+
+        // Clear selection
+        document.getElementById('clearSelection')?.addEventListener('click', () => {
+            if (entanglementsTable) {
+                entanglementsTable.deselectRow();
+            }
+            updateChainDisplay();
+        });
+
+        // Toggle spin
+        document.getElementById('toggleSpin')?.addEventListener('click', () => {
+            if (!nglStage) return;
+            isSpinning = !isSpinning;
+            nglStage.setSpin(isSpinning);
+        });
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', function() {
+            loadProteinData();
+        });
+    </script>
+    
+    <!-- Footer -->
+    <footer style="background: #2c3e50; color: #ecf0f1; padding: 30px; margin-top: 60px; border-top: 1px solid #34495e;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 30px; margin-bottom: 30px;">
+                <div>
+                    <h4 style="color: #3498db;">Navigation</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="index.html" style="color: #ecf0f1; text-decoration: none;">Home</a></li>
+                        <li><a href="submit.html" style="color: #ecf0f1; text-decoration: none;">Submit Analysis</a></li>
+                        <li><a href="browse.html" style="color: #ecf0f1; text-decoration: none;">Browse Results</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #3498db;">Resources</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="documentation.html" style="color: #ecf0f1; text-decoration: none;">Documentation</a></li>
+                        <li><a href="#" onclick="showContactForm(); return false;" style="color: #ecf0f1; text-decoration: none;">Contact Us</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 style="color: #3498db;">Legal</h4>
+                    <ul style="list-style: none; padding: 0;">
+                        <li><a href="#" onclick="showTerms(); return false;" style="color: #ecf0f1; text-decoration: none;">Terms of Service</a></li>
+                        <li><a href="#" onclick="showPrivacy(); return false;" style="color: #ecf0f1; text-decoration: none;">Privacy Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div style="border-top: 1px solid #34495e; padding-top: 20px; text-align: center;">
+                <p style="margin: 10px 0; font-size: 0.9em;">© 2026 Penn State University - O'Brien Lab</p>
+                <p style="margin: 5px 0; font-size: 0.85em; opacity: 0.8;">NCLE - Native Gaussian Entanglement Analysis Platform</p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Contact Form Modal -->
+    <div id="contactModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4);">
+        <div style="background-color: white; margin: 10% auto; padding: 30px; border-radius: 8px; width: 80%; max-width: 500px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <span style="color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="closeContactForm()">&times;</span>
+            <h2 style="color: #333; margin-top: 0;">Contact Us</h2>
+            <form id="contactForm" style="display: flex; flex-direction: column; gap: 15px;">
+                <input type="text" id="contactName" placeholder="Your Name" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="email" id="contactEmail" placeholder="Your Email" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="text" id="contactSubject" placeholder="Subject" required style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <textarea id="contactMessage" placeholder="Your message..." required rows="5" style="padding: 10px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                <button type="button" onclick="submitContactForm()" style="background: #667eea; color: white; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">Send Message</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Modal Functions -->
+    <script>
+        function showContactForm() {
+            document.getElementById('contactModal').style.display = 'block';
+        }
+        
+        function closeContactForm() {
+            document.getElementById('contactModal').style.display = 'none';
+        }
+        
+        function showTerms() {
+            alert('Terms of Service - The NCLE platform is provided for research and educational purposes.');
+        }
+        
+        function showPrivacy() {
+            alert('Privacy Policy - We collect minimal personal information. Your uploaded PDB files are analyzed and results are stored for the specified retention period.');
+        }
+        
+        function submitContactForm() {
+            const name = document.getElementById('contactName').value;
+            const email = document.getElementById('contactEmail').value;
+            const subject = document.getElementById('contactSubject').value;
+            const message = document.getElementById('contactMessage').value;
+            
+            if (!name || !email || !subject || !message) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            fetch('/api/contact', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'name': name,
+                    'email': email,
+                    'subject': subject,
+                    'message': message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Message sent successfully! Thank you for contacting us.');
+                    closeContactForm();
+                    document.getElementById('contactForm').reset();
+                } else {
+                    alert('Error sending message: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error sending message');
+            });
+        }
+        
+        // Download protein data
+        function downloadProteinData() {
+            if (!proteinId || !organism) {
+                alert('Protein information not loaded yet');
+                return;
+            }
+            
+            // Show loading state
+            const downloadBtn = document.getElementById('downloadData');
+            const originalText = downloadBtn.textContent;
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = 'Downloading...';
+            
+            fetch(`${API_BASE_URL}/api/proteome/${organism}/${proteinId}/download`, {
+                method: 'GET'
+            })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.blob();
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${proteinId}_proteome_data.zip`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Reset button
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = originalText;
+            })
+            .catch(error => {
+                console.error('Download error:', error);
+                alert('Error downloading data: ' + error.message);
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = originalText;
+            });
+        }
+        
+        // Set up download button listener when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadBtn = document.getElementById('downloadData');
+            if (downloadBtn) {
+                downloadBtn.addEventListener('click', downloadProteinData);
+            }
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const contactModal = document.getElementById('contactModal');
+            if (event.target == contactModal) {
+                contactModal.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

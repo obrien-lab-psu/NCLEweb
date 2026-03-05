@@ -46,11 +46,6 @@ if __name__ == "__main__":
     cluster_cutoff = args.cluster_cutoff
     model = args.model
 
-    # Default to C-alpha representation for AF models to avoid the large all-atom contact map
-    # that can exhaust memory on big structures. Users can still override with --Calpha/--cg.
-    if model.upper() == 'AF' and not args.Calpha and not args.cg:
-        args.Calpha = True
-        print("Auto-enabling --Calpha for AF model to reduce memory usage (override with --Calpha/--cg as needed)")
     # Set up Gaussian Entanglement and Clustering objects
     ge = GaussianEntanglement(g_threshold=0.6, density=0.0, Calpha=args.Calpha, CG=args.cg, ent_detection_method=args.ent_detection_method)
     clustering = ClusterNativeEntanglements(organism=organism, cut_off=cluster_cutoff)

@@ -154,6 +154,7 @@
         <div class="nav-links">
             <a href="index.html">Home</a>
             <a href="browse.html">Results</a>
+            <a href="proteome.html">Gold Standard</a>
             <a href="documentation.html">Docs</a>
         </div>
     </div>
@@ -711,8 +712,8 @@
                 { title: "TLNc", field: "TLNc", minWidth: 70, widthGrow: 1 },
                 { title: "CCbond", field: "CCbond", minWidth: 90, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
                 { title: "ENT", field: "ENT", minWidth: 70, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
-                { title: "Slipknot_N", field: "Slipknot_N", minWidth: 100, widthGrow: 1, formatter: "tickCross", hozAlign: "center" },
-                { title: "Slipknot_C", field: "Slipknot_C", minWidth: 100, widthGrow: 1, formatter: "tickCross", hozAlign: "center" }
+                { title: "Quality", field: "Quality", minWidth: 100, widthGrow: 1 },
+                { title: "Reason", field: "Reason", minWidth: 200, widthGrow: 2 }
             ];
 
             hqResultsTable = new Tabulator("#hqResultsTable", {

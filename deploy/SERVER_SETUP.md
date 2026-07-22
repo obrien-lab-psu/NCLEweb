@@ -172,20 +172,14 @@ pip install -r requirements.txt
 pip list | grep -E "(fastapi|uvicorn|sqlalchemy)"
 ```
 
-### Install EntDetect:
+### Install NCLEdetector:
 
 ```bash
-# Follow EntDetect installation instructions
-# This will depend on your EntDetect package
-# If it's a separate package, install it:
+# Install NCLEdetector from PyPI
+pip install NCLEdetector
 
-# Example (adjust based on your setup):
-pip install EntDetect
-# Or if it's in a separate repo:
-# cd ~/git_repos
-# git clone https://github.com/your-org/EntDetect.git
-# cd EntDetect
-# pip install -e .
+# Verify installation
+python -c "from NCLEdetector.gaussian_entanglement import GaussianEntanglement; print('✓ NCLEdetector ready')"
 ```
 
 ### Create .env File:

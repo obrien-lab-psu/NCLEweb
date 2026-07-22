@@ -11,7 +11,7 @@ import shutil
 from pathlib import Path
 
 
-from EntDetect.gaussian_entanglement import GaussianEntanglement
+from NCLEdetector.gaussian_entanglement import GaussianEntanglement
 import pandas as pd
 import MDAnalysis as mda
 
@@ -20,7 +20,7 @@ from pdb_preprocessor import preprocess_pdb
 
 # Try to import clustering and feature generation - they may not be available in all environments
 try:
-    from EntDetect.clustering import ClusterNativeEntanglements
+    from NCLEdetector.clustering import ClusterNativeEntanglements
     CLUSTERING_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Clustering not available: {e}")
@@ -122,8 +122,8 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
     pdb_id = Path(pdb_path).stem
     result['pdb_id'] = pdb_id
     
-    # DEBUG: Log parameters and EntDetect source
-    with open('/tmp/api_wrapper_entdetect_debug.log', 'a') as f:
+    # DEBUG: Log parameters and NCLEdetector source
+    with open('/tmp/api_wrapper_ncledetector_debug.log', 'a') as f:
         import datetime
         f.write(f"\ncalculate_native_ge called at {datetime.datetime.now()}\n")
         f.write(f"  pdb_id: {pdb_id}\n")
@@ -255,8 +255,8 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
             print(f"Filtering for high-quality entanglements...")
             try:
                 hq_ent = ge.select_high_quality_entanglements(
-                    GE_filepath=native_ent['outfile'],
-                    pdb=pdb_path,
+                    rawNCLE_file=native_ent['outfile'],
+                    pdb_file=pdb_path,
                     outdir=hq_temp_dir,
                     ID=chain_id,
                     model=structure_type,  # Use user-selected structure type (EXP or AF)
@@ -284,9 +284,10 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         os.makedirs(clustered_temp_dir, exist_ok=True)
                         
                         clustered_ent = clustering.Cluster_NativeEntanglements(
-                            GE_filepath=hq_ent['outfile'],
+                            HQ_NCLE_file=hq_ent['outfile'],
                             outdir=clustered_temp_dir,
-                            outfile=f"{chain_id}_clustered.csv"
+                            ID=chain_id,
+                            chain=chain if chain else None
                         )
                         
                         # Extract clustered results
@@ -355,7 +356,7 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
         if generate_features and uniprot_id and result.get('clustered_data') is not None and FEATURE_GEN_AVAILABLE:
             try:
                 # Import FeatureGen locally to avoid module context issues
-                from EntDetect.entanglement_features import FeatureGen
+                from NCLEdetector.entanglement_features import FeatureGen
 
                 print(f"\n>>> STARTING FEATURE GENERATION <<<", file=sys.stderr)
                 print(f"Generating entanglement features for {uniprot_id}", file=sys.stderr)
@@ -393,16 +394,15 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                         except Exception as debug_e:
                             print(f'DEBUG: Could not get FeatureGen module: {debug_e}', file=sys.stderr)
                         
-                        fgen = FeatureGen(
-                            analysis_pdb,
-                            outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
-                            cluster_file=clustered_file_path
-                        )
+                        fgen = FeatureGen()
             
                         features_result = fgen.get_uent_features(
+                            pdb_file=analysis_pdb,
+                            outdir=os.path.join(temp_dir, f'features_chain_{chain}'),
+                            cluster_file=clustered_file_path,
                             gene=uniprot_id,
-                            chain=chain if chain else None,
-                            pdbid=pdb_id
+                            pdbid=pdb_id,
+                            chain=chain if chain else 'A'
                         )
                         # print(f'features_result: {features_result}', file=sys.stderr)
                         print(features_result['results'], type(features_result['results']), features_result['results'].iloc[0])
@@ -418,7 +418,6 @@ def calculate_native_ge(pdb_path, cleanup=True, structure_type="EXP", organism="
                                 features_df = pd.read_csv(features_file, sep='|')
                                 all_features_dfs.append(features_df)
                                 # DEBUG: Copy CSV to keep it for inspection and log details
-                                import shutil
                                 debug_csv_path = f"/tmp/debug_features_{chain if chain else 'default'}.csv"
                                 shutil.copy(features_file, debug_csv_path)
                                 print(f"    ✓ Loaded {len(features_df)} features from CSV (copied to {debug_csv_path})\n")

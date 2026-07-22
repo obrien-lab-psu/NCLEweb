@@ -50,11 +50,11 @@ pip install python-multipart
 # Database
 # SQLite is built-in, no installation needed
 
-# CRITICAL: Install EntDetect fresh from PyPI
-pip install entdetect
+# CRITICAL: Install NCLEdetector fresh from PyPI
+pip install NCLEdetector
 
-# Verify EntDetect installation
-python -c "from EntDetect.entanglement_features import FeatureGen; print('✓ EntDetect ready')"
+# Verify NCLEdetector installation
+python -c "from NCLEdetector.entanglement_features import FeatureGen; print('✓ NCLEdetector ready')"
 ```
 
 ## Step 4: Verify No Old EntDetect Copies

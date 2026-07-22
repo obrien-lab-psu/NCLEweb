@@ -24,7 +24,7 @@ else
     echo ""
 fi
 
-# Use base conda environment (required for EntDetect 1.1.1 compatibility)
+# Use base conda environment (required for NCLEdetector compatibility)
 eval "$(/home/ianms/miniconda3/bin/conda shell.bash hook)"
 conda activate base
 

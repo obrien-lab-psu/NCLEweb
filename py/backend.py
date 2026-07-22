@@ -31,13 +31,13 @@ load_dotenv()
 # Add py directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent))
 
-# DEBUG: Log which EntDetect is being used
-import EntDetect
-with open('/tmp/backend_entdetect_debug.log', 'a') as f:
+# DEBUG: Log which NCLEdetector is being used
+import NCLEdetector
+with open('/tmp/ncledetector_debug.log', 'a') as f:
     f.write(f"Backend started at {datetime.now()}\n")
     f.write(f"Python: {sys.executable}\n")
     f.write(f"Python version: {sys.version}\n")
-    f.write(f"EntDetect: {EntDetect.__file__}\n")
+    f.write(f"NCLEdetector: {NCLEdetector.__file__}\n")
     f.write(f"sys.path[0]: {sys.path[0]}\n")
     f.write("---\n")
 
@@ -471,7 +471,6 @@ async def process_job_async(job_id: str, temp_pdb_path: str, base_url: str, stru
         pdb_storage_path = os.path.join(pdb_dir, 'structure.pdb')
         
         # Copy temp file to permanent location
-        import shutil
         shutil.copy2(temp_pdb_path, pdb_storage_path)
         
         # Cleanup temp file

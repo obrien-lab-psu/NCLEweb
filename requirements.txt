@@ -16,5 +16,8 @@ MDAnalysis>=2.6.0
 # Topology Analysis
 topoly>=1.0.0
 
+# Entanglement Detection
+NCLEdetector>=2.0.0
+
 # Optional: For better performance
 # python-multipart>=0.0.6
